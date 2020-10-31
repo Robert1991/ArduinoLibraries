@@ -58,6 +58,9 @@ class MQTTRgbLight : public MQTTDevice {
   volatile int blueColorPart = 0;
 
   void reportStatus(MQTTClient* mqttClient);
+  void processBrightnessPayload(String payload);
+  void processColorCommandPayload(String payload);
+  bool processIncomingMessage(String topic, String payload);
 
  public:
   MQTTRgbLight(MQTTRgbLightConfiguration configuration);

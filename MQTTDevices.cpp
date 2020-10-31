@@ -81,41 +81,60 @@ void MQTTRgbLight::reportStatus(MQTTClient* mqttClient) {
   mqttClient->publishMessage(configuration.colorSetStateTopic, concatination);
 }
 
-bool MQTTRgbLight::consumeMessage(MQTTClient* mqttClient, String topic, String payload) {
+void MQTTRgbLight::processBrightnessPayload(String payload) {
+  currentBrightness = (double)(payload.toFloat() / 255.0);
+  Serial.print("brightness is now set to: ");
+  Serial.println(currentBrightness);
+}
+
+void MQTTRgbLight::processColorCommandPayload(String payload) {
+  char buffer[32];
+  payload.toCharArray(buffer, sizeof(buffer));
+  char* p = buffer;
+  char* str;
+  int iteration = 0;
+  while ((str = strtok_r(p, ",", &p)) != NULL) {
+    if (iteration == 0) {
+      redColorPart = atoi(str);
+      Serial.print("red color part was set to: ");
+      Serial.println(redColorPart);
+    } else if (iteration == 1) {
+      greenColorPart = atoi(str);
+      Serial.print("green color part was set to: ");
+      Serial.println(greenColorPart);
+    } else if (iteration == 2) {
+      blueColorPart = atoi(str);
+      Serial.print("blue color part was set to: ");
+      Serial.println(blueColorPart);
+      break;
+    }
+    iteration++;
+  }
+}
+
+bool MQTTRgbLight::processIncomingMessage(String topic, String payload) {
   if (topic.equals(configuration.lightSwitchSubscriptionTopic)) {
     if (payload.equals("ON")) {
       stripOn = true;
     } else {
       stripOn = false;
     }
+    return true;
   } else if (topic.equals(configuration.brightnessSwitchSubscriptionTopic)) {
-    currentBrightness = (double)(payload.toFloat() / 255.0);
-    Serial.print("bright: ");
-    Serial.println(currentBrightness);
+    processBrightnessPayload(payload);
+    return true;
   } else if (topic.equals(configuration.colorSetSubscriptionTopic)) {
-    char buffer[32];
-    payload.toCharArray(buffer, sizeof(buffer));
-    char* p = buffer;
-    char* str;
-    int iteration = 0;
-    while ((str = strtok_r(p, ",", &p)) != NULL) {
-      if (iteration == 0) {
-        redColorPart = atoi(str);
-        Serial.print("red: ");
-        Serial.println(redColorPart);
-      } else if (iteration == 1) {
-        greenColorPart = atoi(str);
-        Serial.print("green: ");
-        Serial.println(greenColorPart);
-      } else if (iteration == 2) {
-        blueColorPart = atoi(str);
-        Serial.print("blue: ");
-        Serial.println(blueColorPart);
-        break;
-      }
-      iteration++;
-    }
+    processColorCommandPayload(payload);
+    return true;
   }
-  applyChoosenColorToLeds();
-  reportStatus(mqttClient);
+  return false;
+}
+
+bool MQTTRgbLight::consumeMessage(MQTTClient* mqttClient, String topic, String payload) {
+  bool stateChanged = processIncomingMessage(topic, payload);
+  if (stateChanged) {
+    applyChoosenColorToLeds();
+    reportStatus(mqttClient);
+  }
+  return stateChanged;
 }
