@@ -1,17 +1,15 @@
 #include "MQTTDevices.h"
 
 MQTTSwitch::MQTTSwitch(MQTTSwitchConfiguration configuration) {
-  this -> mqttClient = mqttClient;
-  this -> configuration = configuration;
+  this->mqttClient = mqttClient;
+  this->configuration = configuration;
 }
-  
-void MQTTSwitch::setupSubscription(MQTTClient* mqttClient) {
-  mqttClient -> subscribeTopic(configuration.switchSubscriptionTopic);
-}
+
+void MQTTSwitch::setupSubscription(MQTTClient* mqttClient) { mqttClient->subscribeTopic(configuration.switchSubscriptionTopic); }
 
 void MQTTSwitch::executeDefaultAction(MQTTClient* mqttClient) {
   switchOn = false;
-  mqttClient -> publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_OFF);
+  mqttClient->publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_OFF);
   applySwitchStatus();
 }
 
@@ -27,25 +25,23 @@ bool MQTTSwitch::consumeMessage(MQTTClient* mqttClient, String topic, String pay
   if (topic.equals(configuration.switchSubscriptionTopic)) {
     if (payload.equals(SWITCH_PAYLOAD_ON)) {
       switchOn = true;
-      mqttClient -> publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_ON);
+      mqttClient->publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_ON);
     } else {
       switchOn = false;
-      mqttClient -> publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_OFF);
-   }
-   applySwitchStatus();
-   return true;
+      mqttClient->publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_OFF);
+    }
+    applySwitchStatus();
+    return true;
   }
   return false;
 }
 
-MQTTRgbLight::MQTTRgbLight(MQTTRgbLightConfiguration configuration) {
-  this->configuration = configuration;
-}
+MQTTRgbLight::MQTTRgbLight(MQTTRgbLightConfiguration configuration) { this->configuration = configuration; }
 
 void MQTTRgbLight::setupSubscription(MQTTClient* mqttClient) {
-  mqttClient -> subscribeTopic(configuration.lightSwitchSubscriptionTopic);
-  mqttClient -> subscribeTopic(configuration.brightnessSwitchSubscriptionTopic);
-  mqttClient -> subscribeTopic(configuration.colorSetSubscriptionTopic);
+  mqttClient->subscribeTopic(configuration.lightSwitchSubscriptionTopic);
+  mqttClient->subscribeTopic(configuration.brightnessSwitchSubscriptionTopic);
+  mqttClient->subscribeTopic(configuration.colorSetSubscriptionTopic);
 }
 
 void MQTTRgbLight::applyChoosenColorToLeds() {
@@ -70,52 +66,55 @@ void MQTTRgbLight::executeDefaultAction(MQTTClient* mqttClient) {
 }
 
 void MQTTRgbLight::reportStatus(MQTTClient* mqttClient) {
-  if(stripOn) {
-     mqttClient -> publishMessage(configuration.lightStateTopic, "{\"state\":\"ON\"}");
+  if (stripOn) {
+    mqttClient->publishMessage(configuration.lightStateTopic, "{\"state\":\"ON\"}");
   } else {
-    mqttClient -> publishMessage(configuration.lightStateTopic, "{\"state\":\"OFF\"}");
+    mqttClient->publishMessage(configuration.lightStateTopic, "{\"state\":\"OFF\"}");
   }
   int brightnessValue = (int)(currentBrightness * 255);
   char brightnessValueStringBuffer[16];
   itoa(brightnessValue, brightnessValueStringBuffer, 10);
-  mqttClient -> publishMessage(configuration.brightnessStateTopic, brightnessValueStringBuffer);
-  
+  mqttClient->publishMessage(configuration.brightnessStateTopic, brightnessValueStringBuffer);
+
   char concatination[256];
-  sprintf(concatination,"{ \"rgb\":[%i,%i,%i]}", redColorPart, greenColorPart, blueColorPart);
-  mqttClient -> publishMessage(configuration.colorSetStateTopic, concatination);
+  sprintf(concatination, "{ \"rgb\":[%i,%i,%i]}", redColorPart, greenColorPart, blueColorPart);
+  mqttClient->publishMessage(configuration.colorSetStateTopic, concatination);
 }
 
 bool MQTTRgbLight::consumeMessage(MQTTClient* mqttClient, String topic, String payload) {
   if (topic.equals(configuration.lightSwitchSubscriptionTopic)) {
-     if (payload.equals("ON")) {
-       stripOn = true;
-     } else {
-       stripOn = false;
-     }
+    if (payload.equals("ON")) {
+      stripOn = true;
+    } else {
+      stripOn = false;
+    }
   } else if (topic.equals(configuration.brightnessSwitchSubscriptionTopic)) {
     currentBrightness = (double)(payload.toFloat() / 255.0);
-    Serial.print("bright: ");Serial.println(currentBrightness);
+    Serial.print("bright: ");
+    Serial.println(currentBrightness);
   } else if (topic.equals(configuration.colorSetSubscriptionTopic)) {
     char buffer[32];
     payload.toCharArray(buffer, sizeof(buffer));
-    char *p = buffer;
-    char *str;
+    char* p = buffer;
+    char* str;
     int iteration = 0;
     while ((str = strtok_r(p, ",", &p)) != NULL) {
-       if (iteration == 0) {
-         redColorPart = atoi(str);
-         Serial.print("red: ");Serial.println(redColorPart);
-       } else if (iteration == 1) {
-         greenColorPart = atoi(str);
-         Serial.print("green: ");Serial.println(greenColorPart);
-       } else if (iteration == 2) {
-         blueColorPart = atoi(str);
-         Serial.print("blue: ");Serial.println(blueColorPart);
-         break;
-       }
-       iteration++;
+      if (iteration == 0) {
+        redColorPart = atoi(str);
+        Serial.print("red: ");
+        Serial.println(redColorPart);
+      } else if (iteration == 1) {
+        greenColorPart = atoi(str);
+        Serial.print("green: ");
+        Serial.println(greenColorPart);
+      } else if (iteration == 2) {
+        blueColorPart = atoi(str);
+        Serial.print("blue: ");
+        Serial.println(blueColorPart);
+        break;
+      }
+      iteration++;
     }
-      
   }
   applyChoosenColorToLeds();
   reportStatus(mqttClient);
