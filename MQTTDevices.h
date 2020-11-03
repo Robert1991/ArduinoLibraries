@@ -3,6 +3,34 @@
 
 #include <IOTClients.h>
 
+#include "Arduino.h"
+
+class MQTTSensor {
+ private:
+  MQTTClient* mqttClient;
+  char* convertToChar(float floatValue);
+
+ public:
+  MQTTSensor(MQTTClient* mqttClient);
+  virtual void setupSensor() = 0;
+  virtual void publishMeasurement() = 0;
+
+ protected:
+  void publishFloatValue(char* stateTopic, float value);
+  void publishBinaryMessage(char* stateTopic, bool on);
+};
+
+class MQTTMotionSensor : public MQTTSensor {
+ private:
+  char* stateTopic;
+  int motionSensorPin;
+
+ public:
+  MQTTMotionSensor(MQTTClient* mqttClient, char* stateTopic, int motionSensorPin);
+  void setupSensor();
+  void publishMeasurement();
+};
+
 struct MQTTSwitchConfiguration {
   char* switchSubscriptionTopic;
   char* switchStateTopic;

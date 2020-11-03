@@ -1,5 +1,40 @@
 #include "MQTTDevices.h"
 
+MQTTSensor::MQTTSensor(MQTTClient* mqttClient) { this->mqttClient = mqttClient; }
+
+char* MQTTSensor::convertToChar(float floatValue) {
+  char result[8];
+  dtostrf(floatValue, 6, 2, result);
+  return result;
+}
+
+void MQTTSensor::publishFloatValue(char* stateTopic, float value) { mqttClient->publishMessage(stateTopic, convertToChar(value)); }
+void MQTTSensor::publishBinaryMessage(char* stateTopic, bool on) {
+  if (on) {
+    mqttClient->publishMessage(stateTopic, "on");
+  } else {
+    mqttClient->publishMessage(stateTopic, "off");
+  }
+}
+
+MQTTMotionSensor::MQTTMotionSensor(MQTTClient* mqttClient, char* stateTopic, int motionSensorPin) : MQTTSensor(mqttClient) {
+  this->stateTopic = stateTopic;
+  this->motionSensorPin = motionSensorPin;
+}
+
+void MQTTMotionSensor::setupSensor() { pinMode(motionSensorPin, INPUT); }
+
+void MQTTMotionSensor::publishMeasurement() {
+  int state = digitalRead(motionSensorPin);
+  if (state == HIGH) {
+    Serial.println("Motion detected");
+    publishBinaryMessage(stateTopic, true);
+  } else {
+    Serial.println("No motion detected");
+    publishBinaryMessage(stateTopic, false);
+  }
+}
+
 MQTTSwitch::MQTTSwitch(MQTTSwitchConfiguration configuration) {
   this->mqttClient = mqttClient;
   this->configuration = configuration;
