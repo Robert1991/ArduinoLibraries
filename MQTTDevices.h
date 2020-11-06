@@ -4,11 +4,12 @@
 #include <IOTClients.h>
 
 #include "Arduino.h"
+#include "DHT.h"
+#include "SerialLogger.h"
 
-class MQTTSensor {
+class MQTTSensor : public SerialLogger {
  private:
   MQTTClient* mqttClient;
-  char* convertToChar(float floatValue);
 
  public:
   MQTTSensor(MQTTClient* mqttClient);
@@ -31,14 +32,29 @@ class MQTTMotionSensor : public MQTTSensor {
   void publishMeasurement();
 };
 
+class MQTTDhtSensor : public MQTTSensor {
+ private:
+  DHT* dhtSensor;
+  char* temperatureStateTopic;
+  char* humidityStateTopic;
+
+  void publishTemperature();
+  void publishHumidity();
+
+ public:
+  MQTTDhtSensor(MQTTClient* mqttClient, DHT* dhtSensor, char* temperatureStateTopic, char* humidityStateTopic);
+  void setupSensor();
+  void publishMeasurement();
+};
+
 struct MQTTSwitchConfiguration {
   char* switchSubscriptionTopic;
   char* switchStateTopic;
   int switchPin;
 };
 
-class MQTTDevice {
-  virtual void setupSubscription(MQTTClient* mqttClient) = 0;
+class MQTTDevice : public SerialLogger {
+  virtual void setupActor(MQTTClient* mqttClient) = 0;
   virtual bool consumeMessage(MQTTClient* mqttClient, String topic, String payload) = 0;
   virtual void executeDefaultAction(MQTTClient* mqttClient) = 0;
 };
@@ -54,7 +70,7 @@ class MQTTSwitch : public MQTTDevice {
  public:
   MQTTSwitch(MQTTSwitchConfiguration configuration);
 
-  void setupSubscription(MQTTClient* mqttClient);
+  void setupActor(MQTTClient* mqttClient);
   void applySwitchStatus();
   bool consumeMessage(MQTTClient* mqttClient, String topic, String payload);
   void executeDefaultAction(MQTTClient* mqttClient);
@@ -92,7 +108,8 @@ class MQTTRgbLight : public MQTTDevice {
 
  public:
   MQTTRgbLight(MQTTRgbLightConfiguration configuration);
-  void setupSubscription(MQTTClient* mqttClient);
+
+  void setupActor(MQTTClient* mqttClient);
   bool consumeMessage(MQTTClient* mqttClient, String topic, String payload);
   void applyChoosenColorToLeds();
   void executeDefaultAction(MQTTClient* mqttClient);

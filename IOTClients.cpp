@@ -14,12 +14,11 @@ void MQTTClient::setupClient(PubSubClient* pubSubClient, const char* mqttBroker,
   this->reconnect();
 }
 
-void MQTTClient::publishMessage(char* topic, char* payload) {
+int MQTTClient::publishMessage(char* topic, char* payload, bool retain) {
   if (!pubSubClient->connected()) {
     this->reconnect();
   }
-  Serial.println("publishing");
-  pubSubClient->publish(topic, payload);
+  return pubSubClient->publish(topic, payload, retain);
 }
 
 void MQTTClient::subscribeTopic(char* topic) {
@@ -37,24 +36,24 @@ void MQTTClient::subscribeTopics(char** subscribeTopics, int countOfTopics) {
 }
 
 void MQTTClient::reconnect(int connectTimeout) {
-  Serial.print("connect...");
+  logToSerial("connect...");
   while (!pubSubClient->connected()) {
-    Serial.println("Reconnecting...");
+    logLineToSerial("Reconnecting...");
     if (!pubSubClient->connect(clientName, userName, password)) {
-      Serial.print("failed, return state=");
-      Serial.print(pubSubClient->state());
-      Serial.print(" retrying in ");
-      Serial.print(connectTimeout);
-      Serial.println(" milli seconds");
+      logToSerial("failed, return state=");
+      logToSerial(pubSubClient->state());
+      logToSerial(" retrying in ");
+      logToSerial(connectTimeout);
+      logLineToSerial(" milli seconds");
       delay(connectTimeout);
     }
   }
   for (int i = 0; i < subscribeTopicCount; i++) {
-    Serial.print("Subscribing: ");
-    Serial.println(subscribeTopicArray[i]);
+    logToSerial("Subscribing: ");
+    logLineToSerial(subscribeTopicArray[i]);
     boolean subscriptionSuccessful = pubSubClient->subscribe(subscribeTopicArray[i]);
-    Serial.print("Subscription return status: ");
-    Serial.println(subscriptionSuccessful);
+    logToSerial("Subscription return status: ");
+    logLineToSerial(subscriptionSuccessful);
   }
   loopClient();
 }

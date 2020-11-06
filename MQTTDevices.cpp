@@ -2,13 +2,12 @@
 
 MQTTSensor::MQTTSensor(MQTTClient* mqttClient) { this->mqttClient = mqttClient; }
 
-char* MQTTSensor::convertToChar(float floatValue) {
+void MQTTSensor::publishFloatValue(char* stateTopic, float floatValue) {
   char result[8];
   dtostrf(floatValue, 6, 2, result);
-  return result;
+  mqttClient->publishMessage(stateTopic, result);
 }
 
-void MQTTSensor::publishFloatValue(char* stateTopic, float value) { mqttClient->publishMessage(stateTopic, convertToChar(value)); }
 void MQTTSensor::publishBinaryMessage(char* stateTopic, bool on) {
   if (on) {
     mqttClient->publishMessage(stateTopic, "on");
@@ -27,11 +26,45 @@ void MQTTMotionSensor::setupSensor() { pinMode(motionSensorPin, INPUT); }
 void MQTTMotionSensor::publishMeasurement() {
   int state = digitalRead(motionSensorPin);
   if (state == HIGH) {
-    Serial.println("Motion detected");
+    logLineToSerial("Motion detected");
     publishBinaryMessage(stateTopic, true);
   } else {
-    Serial.println("No motion detected");
+    logLineToSerial("No motion detected");
     publishBinaryMessage(stateTopic, false);
+  }
+}
+
+MQTTDhtSensor::MQTTDhtSensor(MQTTClient* mqttClient, DHT* dhtSensor, char* temperatureStateTopic, char* humidityStateTopic) : MQTTSensor(mqttClient) {
+  this->dhtSensor = dhtSensor;
+  this->temperatureStateTopic = temperatureStateTopic;
+  this->humidityStateTopic = humidityStateTopic;
+}
+
+void MQTTDhtSensor::setupSensor() { dhtSensor->begin(); }
+void MQTTDhtSensor::publishMeasurement() {
+  publishTemperature();
+  publishHumidity();
+}
+
+void MQTTDhtSensor::publishTemperature() {
+  float currentTempSensorValue = dhtSensor->readTemperature();
+  if (!isnan(currentTempSensorValue)) {
+    logToSerial("Temperatur: ");
+    logToSerial(currentTempSensorValue);
+    logLineToSerial(" degrees celcius");
+
+    publishFloatValue(temperatureStateTopic, currentTempSensorValue);
+  }
+}
+
+void MQTTDhtSensor::publishHumidity() {
+  float currentHumiditySensorValue = dhtSensor->readHumidity();
+  if (!isnan(currentHumiditySensorValue)) {
+    logToSerial("Humidity: ");
+    logToSerial(currentHumiditySensorValue);
+    logLineToSerial("%\t");
+
+    publishFloatValue(humidityStateTopic, currentHumiditySensorValue);
   }
 }
 
@@ -40,7 +73,10 @@ MQTTSwitch::MQTTSwitch(MQTTSwitchConfiguration configuration) {
   this->configuration = configuration;
 }
 
-void MQTTSwitch::setupSubscription(MQTTClient* mqttClient) { mqttClient->subscribeTopic(configuration.switchSubscriptionTopic); }
+void MQTTSwitch::setupActor(MQTTClient* mqttClient) {
+  pinMode(configuration.switchPin, OUTPUT);
+  mqttClient->subscribeTopic(configuration.switchSubscriptionTopic);
+}
 
 void MQTTSwitch::executeDefaultAction(MQTTClient* mqttClient) {
   switchOn = false;
@@ -73,10 +109,14 @@ bool MQTTSwitch::consumeMessage(MQTTClient* mqttClient, String topic, String pay
 
 MQTTRgbLight::MQTTRgbLight(MQTTRgbLightConfiguration configuration) { this->configuration = configuration; }
 
-void MQTTRgbLight::setupSubscription(MQTTClient* mqttClient) {
+void MQTTRgbLight::setupActor(MQTTClient* mqttClient) {
+  pinMode(configuration.pins.red, OUTPUT);
+  pinMode(configuration.pins.green, OUTPUT);
+  pinMode(configuration.pins.blue, OUTPUT);
   mqttClient->subscribeTopic(configuration.lightSwitchSubscriptionTopic);
   mqttClient->subscribeTopic(configuration.brightnessSwitchSubscriptionTopic);
   mqttClient->subscribeTopic(configuration.colorSetSubscriptionTopic);
+  mqttClient->subscribeTopic(configuration.lightStateTopic);
 }
 
 void MQTTRgbLight::applyChoosenColorToLeds() {
@@ -93,7 +133,7 @@ void MQTTRgbLight::applyChoosenColorToLeds() {
 
 void MQTTRgbLight::executeDefaultAction(MQTTClient* mqttClient) {
   currentBrightness = 1.0;
-  redColorPart = 255;
+  redColorPart = 0;
   greenColorPart = 0;
   blueColorPart = 0;
   stripOn = false;
@@ -102,9 +142,9 @@ void MQTTRgbLight::executeDefaultAction(MQTTClient* mqttClient) {
 
 void MQTTRgbLight::reportStatus(MQTTClient* mqttClient) {
   if (stripOn) {
-    mqttClient->publishMessage(configuration.lightStateTopic, "{\"state\":\"ON\"}");
+    mqttClient->publishMessage(configuration.lightStateTopic, "{\"state\":\"ON\"}", true);
   } else {
-    mqttClient->publishMessage(configuration.lightStateTopic, "{\"state\":\"OFF\"}");
+    mqttClient->publishMessage(configuration.lightStateTopic, "{\"state\":\"OFF\"}", true);
   }
   int brightnessValue = (int)(currentBrightness * 255);
   char brightnessValueStringBuffer[16];
@@ -118,8 +158,8 @@ void MQTTRgbLight::reportStatus(MQTTClient* mqttClient) {
 
 void MQTTRgbLight::processBrightnessPayload(String payload) {
   currentBrightness = (double)(payload.toFloat() / 255.0);
-  Serial.print("brightness is now set to: ");
-  Serial.println(currentBrightness);
+  logToSerial("brightness is now set to: ");
+  logLineToSerial(currentBrightness);
 }
 
 void MQTTRgbLight::processColorCommandPayload(String payload) {
@@ -131,16 +171,16 @@ void MQTTRgbLight::processColorCommandPayload(String payload) {
   while ((str = strtok_r(p, ",", &p)) != NULL) {
     if (iteration == 0) {
       redColorPart = atoi(str);
-      Serial.print("red color part was set to: ");
-      Serial.println(redColorPart);
+      logToSerial("red color part was set to: ");
+      logLineToSerial(redColorPart);
     } else if (iteration == 1) {
       greenColorPart = atoi(str);
-      Serial.print("green color part was set to: ");
-      Serial.println(greenColorPart);
+      logToSerial("green color part was set to: ");
+      logLineToSerial(greenColorPart);
     } else if (iteration == 2) {
       blueColorPart = atoi(str);
-      Serial.print("blue color part was set to: ");
-      Serial.println(blueColorPart);
+      logToSerial("blue color part was set to: ");
+      logLineToSerial(blueColorPart);
       break;
     }
     iteration++;
@@ -150,8 +190,10 @@ void MQTTRgbLight::processColorCommandPayload(String payload) {
 bool MQTTRgbLight::processIncomingMessage(String topic, String payload) {
   if (topic.equals(configuration.lightSwitchSubscriptionTopic)) {
     if (payload.equals("ON")) {
+      logLineToSerial("Strip was turned on");
       stripOn = true;
     } else {
+      logLineToSerial("Strip was turned off");
       stripOn = false;
     }
     return true;
