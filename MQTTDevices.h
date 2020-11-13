@@ -2,6 +2,7 @@
 #define MQTTDevices_h
 
 #include <IOTClients.h>
+#include <wireUtils.h>
 
 #include "Arduino.h"
 #include "DHT.h"
@@ -114,4 +115,56 @@ class MQTTRgbLight : public MQTTDevice {
   void applyChoosenColorToLeds();
   void executeDefaultAction(MQTTClient* mqttClient);
 };
+
+struct WirePinSet {
+  int i2cSecondaryAddress;
+  int sdaPin;
+  int sclPin;
+};
+
+struct MQTTRgbLightI2CCommands {
+  int setOnOffCommand;
+  int setColorCommand;
+  int setBrightnessCommand;
+};
+
+struct MQTTI2CRgbLightConfiguration {
+  MQTTRgbLightI2CCommands i2cConnectionCommands;
+  WirePinSet wirePins;
+  char* lightStateTopic;
+  char* lightSwitchSubscriptionTopic;
+  char* brightnessSwitchSubscriptionTopic;
+  char* brightnessStateTopic;
+  char* colorSetSubscriptionTopic;
+  char* colorSetStateTopic;
+};
+
+class MQTTI2CRgbLight : public MQTTDevice {
+ private:
+  bool stripOn = false;
+  int currentBrightness = 0;
+  int redColorPart = 0;
+  int greenColorPart = 0;
+  int blueColorPart = 0;
+
+  bool colorChanged = true;
+  bool onOffStatusChanged = true;
+  bool brightnessChanged = true;
+
+  MQTTI2CRgbLightConfiguration lightConfiguration;
+  void sendRGBValuesToSecondary(byte redValue, byte greenValue, byte blueValue, int delayTime = 75);
+  void refreshI2CConnection();
+  void reportStatus(MQTTClient* mqttClient);
+  void processColorCommandPayload(String payload);
+  bool processIncomingMessage(String topic, String payload);
+
+ public:
+  MQTTI2CRgbLight(MQTTI2CRgbLightConfiguration lightConfiguration);
+  void setupActor(MQTTClient* mqttClient);
+  bool consumeMessage(MQTTClient* mqttClient, String topic, String payload);
+  void applyChoosenColorToLeds();
+
+  void executeDefaultAction(MQTTClient* mqttClient);
+};
+
 #endif

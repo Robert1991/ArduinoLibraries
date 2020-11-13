@@ -95,9 +95,11 @@ void MQTTSwitch::applySwitchStatus() {
 bool MQTTSwitch::consumeMessage(MQTTClient* mqttClient, String topic, String payload) {
   if (topic.equals(configuration.switchSubscriptionTopic)) {
     if (payload.equals(SWITCH_PAYLOAD_ON)) {
+      logLineToSerial("Switch was turned on");
       switchOn = true;
       mqttClient->publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_ON);
     } else {
+      logLineToSerial("Switch was turned off");
       switchOn = false;
       mqttClient->publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_OFF);
     }
@@ -214,4 +216,160 @@ bool MQTTRgbLight::consumeMessage(MQTTClient* mqttClient, String topic, String p
     reportStatus(mqttClient);
   }
   return stateChanged;
+}
+
+MQTTI2CRgbLight::MQTTI2CRgbLight(MQTTI2CRgbLightConfiguration lightConfiguration) { this->lightConfiguration = lightConfiguration; }
+
+void MQTTI2CRgbLight::executeDefaultAction(MQTTClient* mqttClient) {}
+
+void MQTTI2CRgbLight::processColorCommandPayload(String payload) {
+  char buffer[32];
+  payload.toCharArray(buffer, sizeof(buffer));
+  char* p = buffer;
+  char* str;
+  int iteration = 0;
+  while ((str = strtok_r(p, ",", &p)) != NULL) {
+    if (iteration == 0) {
+      int requestedRedColorPart = atoi(str);
+      if (requestedRedColorPart != redColorPart) {
+        colorChanged = true;
+        redColorPart = requestedRedColorPart;
+        logToSerial("red color part was set to: ");
+        logLineToSerial(redColorPart);
+      }
+    } else if (iteration == 1) {
+      int requestedGreenColorPart = atoi(str);
+      if (requestedGreenColorPart != greenColorPart) {
+        colorChanged = true;
+        greenColorPart = requestedGreenColorPart;
+        logToSerial("red color part was set to: ");
+        logLineToSerial(greenColorPart);
+      }
+    } else if (iteration == 2) {
+      int requestedBlueColorPart = atoi(str);
+      if (requestedBlueColorPart != blueColorPart) {
+        colorChanged = true;
+        blueColorPart = requestedBlueColorPart;
+        logToSerial("red color part was set to: ");
+        logLineToSerial(blueColorPart);
+      }
+      break;
+    }
+    iteration++;
+  }
+}
+
+bool MQTTI2CRgbLight::processIncomingMessage(String topic, String payload) {
+  if (topic.equals(lightConfiguration.lightSwitchSubscriptionTopic)) {
+    if (payload.equals("ON") && !stripOn || payload.equals("OFF") && stripOn) {
+      onOffStatusChanged = true;
+      if (payload.equals("ON")) {
+        logLineToSerial("Strip was turned on");
+        stripOn = true;
+      } else {
+        logLineToSerial("Strip was turned off");
+        stripOn = false;
+      }
+      return true;
+    }
+    return false;
+  } else if (topic.equals(lightConfiguration.brightnessSwitchSubscriptionTopic)) {
+    int requestedBrightness = payload.toInt();
+    if (requestedBrightness != currentBrightness) {
+      brightnessChanged = true;
+      currentBrightness = requestedBrightness;
+      return true;
+    }
+    return false;
+  } else if (topic.equals(lightConfiguration.colorSetSubscriptionTopic)) {
+    processColorCommandPayload(payload);
+    return colorChanged;
+  }
+  return false;
+}
+
+void MQTTI2CRgbLight::reportStatus(MQTTClient* mqttClient) {
+  if (stripOn) {
+    mqttClient->publishMessage(lightConfiguration.lightStateTopic, "{\"state\":\"ON\"}");
+  } else {
+    mqttClient->publishMessage(lightConfiguration.lightStateTopic, "{\"state\":\"OFF\"}");
+  }
+  char brightnessValueStringBuffer[16];
+  itoa(currentBrightness, brightnessValueStringBuffer, 10);
+  mqttClient->publishMessage(lightConfiguration.brightnessStateTopic, brightnessValueStringBuffer);
+
+  char concatination[256];
+  sprintf(concatination, "{ \"rgb\":[%i,%i,%i]}", redColorPart, greenColorPart, blueColorPart);
+  mqttClient->publishMessage(lightConfiguration.colorSetStateTopic, concatination);
+}
+
+bool MQTTI2CRgbLight::consumeMessage(MQTTClient* mqttClient, String topic, String payload) {
+  bool stateChanged = processIncomingMessage(topic, payload);
+  if (stateChanged) {
+    reportStatus(mqttClient);
+    applyChoosenColorToLeds();
+  }
+  return stateChanged;
+}
+
+void MQTTI2CRgbLight::setupActor(MQTTClient* mqttClient) {
+  establishI2CConnectionTo(lightConfiguration.wirePins.sdaPin, lightConfiguration.wirePins.sclPin, true);
+  mqttClient->subscribeTopic(lightConfiguration.lightSwitchSubscriptionTopic);
+  mqttClient->subscribeTopic(lightConfiguration.brightnessSwitchSubscriptionTopic);
+  mqttClient->subscribeTopic(lightConfiguration.colorSetSubscriptionTopic);
+  mqttClient->subscribeTopic(lightConfiguration.lightStateTopic);
+}
+
+void MQTTI2CRgbLight::refreshI2CConnection() {
+  if (checkI2CConnection()) {
+    Serial.println("connection to slave got lost. trying to reestablish connection...");
+    establishI2CConnectionTo(lightConfiguration.wirePins.sdaPin, lightConfiguration.wirePins.sclPin);
+  } else {
+    while (Wire.available()) {
+      Serial.println("flushing wire");
+    }
+  }
+}
+
+void MQTTI2CRgbLight::sendRGBValuesToSecondary(byte redValue, byte greenValue, byte blueValue, int delayTime) {
+  refreshI2CConnection();
+  Serial.print("Sending I2C command {");
+  Serial.print(lightConfiguration.i2cConnectionCommands.setColorCommand);
+  Serial.print("} with parameter {");
+  Serial.print(redValue);
+  Serial.print(";");
+  Serial.print(greenValue);
+  Serial.print(";");
+  Serial.print(blueValue);
+  Serial.println("}");
+  Wire.beginTransmission(lightConfiguration.wirePins.i2cSecondaryAddress);
+  Wire.write(lightConfiguration.i2cConnectionCommands.setColorCommand);
+  Wire.write(redValue);
+  Wire.write(greenValue);
+  Wire.write(blueValue);
+  Wire.endTransmission();
+  delay(delayTime);
+}
+
+void MQTTI2CRgbLight::applyChoosenColorToLeds() {
+  if (stripOn) {
+    if (onOffStatusChanged) {
+      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress, lightConfiguration.i2cConnectionCommands.setOnOffCommand, 1);
+      onOffStatusChanged = false;
+    }
+    if (colorChanged) {
+      sendRGBValuesToSecondary(redColorPart, greenColorPart, blueColorPart);
+      colorChanged = false;
+    }
+    if (brightnessChanged) {
+      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress, lightConfiguration.i2cConnectionCommands.setBrightnessCommand,
+                                  currentBrightness);
+      brightnessChanged = false;
+    }
+  } else {
+    if (onOffStatusChanged) {
+      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress, lightConfiguration.i2cConnectionCommands.setOnOffCommand, 0);
+      onOffStatusChanged = false;
+    }
+  }
 }
