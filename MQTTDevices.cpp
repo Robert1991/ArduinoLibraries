@@ -25,14 +25,19 @@ void MQTTMotionSensor::setupSensor() { pinMode(motionSensorPin, INPUT); }
 
 void MQTTMotionSensor::publishMeasurement() {
   int state = digitalRead(motionSensorPin);
+  bool motionDetected = false;
   if (state == HIGH) {
     logLineToSerial("Motion detected");
-    publishBinaryMessage(stateTopic, true);
-  } else {
-    logLineToSerial("No motion detected");
-    publishBinaryMessage(stateTopic, false);
+    motionDetected = true;
+  }
+
+  if (lastMotionSensorState != motionDetected) {
+    publishBinaryMessage(stateTopic, motionDetected);
+    lastMotionSensorState = motionDetected;
   }
 }
+
+void MQTTMotionSensor::reset() { lastMotionSensorState = false; }
 
 MQTTDhtSensor::MQTTDhtSensor(MQTTClient* mqttClient, DHT* dhtSensor, char* temperatureStateTopic, char* humidityStateTopic) : MQTTSensor(mqttClient) {
   this->dhtSensor = dhtSensor;
@@ -49,23 +54,41 @@ void MQTTDhtSensor::publishMeasurement() {
 void MQTTDhtSensor::publishTemperature() {
   float currentTempSensorValue = dhtSensor->readTemperature();
   if (!isnan(currentTempSensorValue)) {
-    logToSerial("Temperatur: ");
-    logToSerial(currentTempSensorValue);
-    logLineToSerial(" degrees celcius");
+    if (!areEqual(lastMeasuredTemperature, currentTempSensorValue)) {
+      logToSerial("Temperature: ");
+      logToSerial(currentTempSensorValue);
+      logLineToSerial(" degrees celcius");
 
-    publishFloatValue(temperatureStateTopic, currentTempSensorValue);
+      publishFloatValue(temperatureStateTopic, currentTempSensorValue);
+      lastMeasuredTemperature = currentTempSensorValue;
+    }
   }
 }
 
 void MQTTDhtSensor::publishHumidity() {
   float currentHumiditySensorValue = dhtSensor->readHumidity();
   if (!isnan(currentHumiditySensorValue)) {
-    logToSerial("Humidity: ");
-    logToSerial(currentHumiditySensorValue);
-    logLineToSerial("%\t");
+    if (!areEqual(lastMeasuredHumidity, currentHumiditySensorValue)) {
+      logToSerial("Humidity: ");
+      logToSerial(currentHumiditySensorValue);
+      logLineToSerial("%\t");
 
-    publishFloatValue(humidityStateTopic, currentHumiditySensorValue);
+      publishFloatValue(humidityStateTopic, currentHumiditySensorValue);
+      lastMeasuredHumidity = currentHumiditySensorValue;
+    }
   }
+}
+
+void MQTTDhtSensor::reset() {
+  lastMeasuredTemperature = 0.0;
+  lastMeasuredHumidity = 0.0;
+}
+
+bool MQTTDhtSensor::areEqual(float value1, float value2) {
+  if (abs(value1 - value2) > 0.001) {
+    return false;
+  }
+  return true;
 }
 
 MQTTSwitch::MQTTSwitch(MQTTSwitchConfiguration configuration) {

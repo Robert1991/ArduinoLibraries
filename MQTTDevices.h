@@ -16,6 +16,7 @@ class MQTTSensor : public SerialLogger {
   MQTTSensor(MQTTClient* mqttClient);
   virtual void setupSensor() = 0;
   virtual void publishMeasurement() = 0;
+  virtual void reset() = 0;
 
  protected:
   void publishFloatValue(char* stateTopic, float value);
@@ -26,11 +27,13 @@ class MQTTMotionSensor : public MQTTSensor {
  private:
   char* stateTopic;
   int motionSensorPin;
+  bool lastMotionSensorState = false;
 
  public:
   MQTTMotionSensor(MQTTClient* mqttClient, char* stateTopic, int motionSensorPin);
   void setupSensor();
   void publishMeasurement();
+  void reset();
 };
 
 class MQTTDhtSensor : public MQTTSensor {
@@ -38,7 +41,10 @@ class MQTTDhtSensor : public MQTTSensor {
   DHT* dhtSensor;
   char* temperatureStateTopic;
   char* humidityStateTopic;
+  float lastMeasuredTemperature = 0.0;
+  float lastMeasuredHumidity = 0.0;
 
+  bool areEqual(float value1, float value2);
   void publishTemperature();
   void publishHumidity();
 
@@ -46,6 +52,7 @@ class MQTTDhtSensor : public MQTTSensor {
   MQTTDhtSensor(MQTTClient* mqttClient, DHT* dhtSensor, char* temperatureStateTopic, char* humidityStateTopic);
   void setupSensor();
   void publishMeasurement();
+  void reset();
 };
 
 struct MQTTSwitchConfiguration {
