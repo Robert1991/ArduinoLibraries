@@ -35,34 +35,50 @@ void MQTTClient::subscribeTopics(char** subscribeTopics, int countOfTopics) {
   }
 }
 
-void MQTTClient::reconnect(int connectTimeout) {
+bool MQTTClient::reconnect(int connectTimeout, int reconnectTries) {
   logToSerial("connect...");
-  while (!pubSubClient->connected()) {
+
+  int currentTry = 0;
+  bool connectionEstablished = false;
+  while (!pubSubClient->connected() && (currentTry < reconnectTries)) {
     logLineToSerial("Reconnecting...");
-    if (!pubSubClient->connect(clientName, userName, password)) {
+    connectionEstablished = pubSubClient->connect(clientName, userName, password);
+    if (!connectionEstablished) {
       logToSerial("failed, return state=");
       logToSerial(pubSubClient->state());
       logToSerial(" retrying in ");
       logToSerial(connectTimeout);
       logLineToSerial(" milli seconds");
       delay(connectTimeout);
+      currentTry++;
+    } else {
+      break;
     }
   }
-  for (int i = 0; i < subscribeTopicCount; i++) {
-    logToSerial("Subscribing: ");
-    logLineToSerial(subscribeTopicArray[i]);
-    boolean subscriptionSuccessful = pubSubClient->subscribe(subscribeTopicArray[i]);
-    logToSerial("Subscription return status: ");
-    logLineToSerial(subscriptionSuccessful);
+  if (connectionEstablished) {
+    for (int i = 0; i < subscribeTopicCount; i++) {
+      logToSerial("Subscribing: ");
+      logLineToSerial(subscribeTopicArray[i]);
+      boolean subscriptionSuccessful = pubSubClient->subscribe(subscribeTopicArray[i]);
+      logToSerial("Subscription return status: ");
+      logLineToSerial(subscriptionSuccessful);
+    }
+    loopClient();
   }
-  loopClient();
+  return connectionEstablished;
 }
 
-void MQTTClient::loopClient() {
+bool MQTTClient::loopClient() {
   if (!pubSubClient->connected()) {
-    this->reconnect();
+    if (this->reconnect()) {
+      pubSubClient->loop();
+      return true;
+    } else {
+      return false;
+    }
   }
   pubSubClient->loop();
+  return true;
 }
 
 void setupWifiConnection(const char* ssid, const char* password) {
@@ -79,4 +95,24 @@ void setupWifiConnection(const char* ssid, const char* password) {
   Serial.println("Connection established!");
   Serial.print("IP address:\t");
   Serial.println(WiFi.localIP());
+}
+
+unsigned long last_wifi_reconnect_attempt = 0;
+
+void checkWifiStatus(const char* ssid, const char* password) {
+  if (WiFi.status() != WL_CONNECTED) {
+    unsigned long now = millis();
+    if (now - last_wifi_reconnect_attempt > 20000UL || last_wifi_reconnect_attempt == 0) {
+      Serial.println("Attempting to connect to WiFi");
+      last_wifi_reconnect_attempt = now;
+      setupWifiConnection(ssid, password);
+    }
+    return;
+  }
+}
+
+void displayFreeRam() {
+  uint32_t free = system_get_free_heap_size();
+  Serial.print("Free ram: ");
+  Serial.println(free);
 }
