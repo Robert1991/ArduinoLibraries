@@ -20,13 +20,13 @@ class SerialLogger {
     }
   };
 
-  void logLineToSerial(char* message) {
+  void logLineToSerial(String message) {
     if (verboseLoggingIsEnabled) {
       Serial.println(message);
     }
   };
 
-  void logToSerial(char* message) {
+  void logToSerial(String message) {
     if (verboseLoggingIsEnabled) {
       Serial.print(message);
     }
