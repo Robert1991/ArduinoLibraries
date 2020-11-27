@@ -65,15 +65,15 @@ int clearI2CBus(int sdaPin, int sclPin, bool startupDelay) {
   return 0;  // all ok
 }
 
-bool checkI2CConnection() {
+bool checkI2CConnection(int sdaPin, int sclPin) {
   bool connectionWasLost = false;
-  pinMode(D1, INPUT);
-  pinMode(D2, INPUT);
-  if (digitalRead(D1) != 1) {
+  pinMode(sdaPin, INPUT);
+  pinMode(sclPin, INPUT);
+  if (digitalRead(sdaPin) != 1) {
     Serial.println("SDA pin is low");
     connectionWasLost = true;
   }
-  if (digitalRead(D2) != 1) {
+  if (digitalRead(sclPin) != 1) {
     Serial.println("SCL pin is low");
     connectionWasLost = true;
   }

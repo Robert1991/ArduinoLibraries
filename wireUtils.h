@@ -9,7 +9,7 @@
 // see http://www.forward.com.au/pfod/ArduinoProgramming/I2C_ClearBus/index.html
 int clearI2CBus(int sdaPin, int sclPin, bool startupDelay = false);
 
-bool checkI2CConnection();
+bool checkI2CConnection(int sdaPin, int sclPin);
 
 void establishI2CConnectionTo(int sdaPort, int sclPort, bool startupDelay = false);
 
