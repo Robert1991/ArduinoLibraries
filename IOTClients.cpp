@@ -1,6 +1,6 @@
 #include <IOTClients.h>
 
-MQTTClient::MQTTClient(const char* clientName, const char* userName, const char* password, int subscriptionTopicBufferSize) {
+MessageQueueClient::MessageQueueClient(const char* clientName, const char* userName, const char* password, int subscriptionTopicBufferSize) {
   this->clientName = clientName;
   this->userName = userName;
   this->password = password;
@@ -8,58 +8,55 @@ MQTTClient::MQTTClient(const char* clientName, const char* userName, const char*
   subscribeTopicArray = new char*[subscriptionTopicBufferSize];
 }
 
-void MQTTClient::setupClient(PubSubClient* pubSubClient, const char* mqttBroker, const int mqttPort) {
-  this->pubSubClient = pubSubClient;
-  pubSubClient->setServer(mqttBroker, mqttPort);
+void MessageQueueClient::setupClient(MQTTClient* mqttClient) {
+  this->mqttClient = mqttClient;
   this->reconnect();
 }
 
-int MQTTClient::publishMessage(char* topic, char* payload, bool retain) {
-  if (!pubSubClient->connected()) {
+int MessageQueueClient::publishMessage(String topic, String payload, bool retain) {
+  if (!mqttClient->connected()) {
     this->reconnect();
+    logLineToSerial("Message queue client is connected!");
   }
-  return pubSubClient->publish(topic, payload, retain);
+
+  return mqttClient->publish(topic, payload, retain, 1);
 }
 
-void MQTTClient::subscribeTopic(char* topic) {
+void MessageQueueClient::subscribeTopic(char* topic) {
+  if (!mqttClient->connected()) {
+    this->reconnect();
+    logLineToSerial("Message queue client is connected!");
+  }
   if (subscribeTopicCount < subscriptionTopicBufferSize) {
     subscribeTopicArray[subscribeTopicCount] = topic;
     subscribeTopicCount++;
   }
 }
 
-void MQTTClient::subscribeTopics(char** subscribeTopics, int countOfTopics) {
+void MessageQueueClient::subscribeTopics(char** subscribeTopics, int countOfTopics) {
   for (int i = 0; i < countOfTopics; i++) {
     subscribeTopicArray[subscribeTopicCount] = subscribeTopics[i];
     subscribeTopicCount++;
   }
 }
 
-bool MQTTClient::reconnect(int connectTimeout, int reconnectTries) {
-  logToSerial("connect...");
+bool MessageQueueClient::reconnect(int connectTimeout, int reconnectTries) {
+  logToSerial("connecting mqtt client...");
 
   int currentTry = 0;
   bool connectionEstablished = false;
-  while (!pubSubClient->connected() && (currentTry < reconnectTries)) {
-    logLineToSerial("Reconnecting...");
-    connectionEstablished = pubSubClient->connect(clientName, userName, password);
-    if (!connectionEstablished) {
-      logToSerial("failed, return state=");
-      logToSerial(pubSubClient->state());
-      logToSerial(" retrying in ");
-      logToSerial(connectTimeout);
-      logLineToSerial(" milli seconds");
-      delay(connectTimeout);
-      currentTry++;
-    } else {
-      break;
-    }
+  while (!mqttClient->connect(clientName, userName, password) && (currentTry < reconnectTries)) {
+    logLineToSerial("Connection attemp failed. Reconnecting...");
+    currentTry++;
+  }
+  if (currentTry >= reconnectTries) {
+    return false;
   }
   if (connectionEstablished) {
     for (int i = 0; i < subscribeTopicCount; i++) {
       logToSerial("Subscribing: ");
       logLineToSerial(subscribeTopicArray[i]);
-      boolean subscriptionSuccessful = pubSubClient->subscribe(subscribeTopicArray[i]);
+      boolean subscriptionSuccessful = mqttClient->subscribe(subscribeTopicArray[i]);
       logToSerial("Subscription return status: ");
       logLineToSerial(subscriptionSuccessful);
     }
@@ -68,17 +65,14 @@ bool MQTTClient::reconnect(int connectTimeout, int reconnectTries) {
   return connectionEstablished;
 }
 
-bool MQTTClient::loopClient() {
-  if (!pubSubClient->connected()) {
+bool MessageQueueClient::loopClient() {
+  if (!mqttClient->connected()) {
     if (this->reconnect()) {
-      pubSubClient->loop();
-      return true;
-    } else {
-      return false;
+      return mqttClient->loop();
     }
+    return false;
   }
-  pubSubClient->loop();
-  return true;
+  return mqttClient->loop();
 }
 
 void setupWifiConnection(const char* ssid, const char* password) {

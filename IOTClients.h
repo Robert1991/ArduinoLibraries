@@ -2,7 +2,7 @@
 #define IOTClients_h
 
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>
+#include <MQTT.h>
 
 #include "SerialLogger.h"
 
@@ -12,9 +12,9 @@ extern "C" {
 
 #define SUBSCRIPTION_TOPIC_BUFFER_SIZE 20
 
-class MQTTClient : public SerialLogger {
+class MessageQueueClient : public SerialLogger {
  private:
-  PubSubClient* pubSubClient;
+  MQTTClient* mqttClient;
   const char* clientName;
   const char* userName;
   const char* password;
@@ -25,10 +25,10 @@ class MQTTClient : public SerialLogger {
   bool reconnect(int connectTimeout = 5000, int reconnectTries = 5);
 
  public:
-  MQTTClient(const char* clientName, const char* userName, const char* password, int subscriptionTopicBufferSize = 20);
+  MessageQueueClient(const char* clientName, const char* userName, const char* password, int subscriptionTopicBufferSize = 20);
 
-  void setupClient(PubSubClient* pubSubClient, const char* mqttBroker, const int mqttPort = 1883);
-  int publishMessage(char* topic, char* payload, bool retain = false);
+  void setupClient(MQTTClient* mqttClient);
+  int publishMessage(String topic, String payload, bool retain = false);
   void subscribeTopic(char* topic);
   void subscribeTopics(char** subscribeTopics, int subscribeTopicCount);
   bool loopClient();

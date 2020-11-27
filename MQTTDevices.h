@@ -1,6 +1,7 @@
 #ifndef MQTTDevices_h
 #define MQTTDevices_h
 
+#include <ArduinoJson.h>
 #include <IOTClients.h>
 #include <wireUtils.h>
 
@@ -8,51 +9,186 @@
 #include "DHT.h"
 #include "SerialLogger.h"
 
-class MQTTSensor : public SerialLogger {
- private:
-  MQTTClient* mqttClient;
+struct MQTTDeviceClassification {
+  String sensorUniqueId;
+  String deviceClass;
+  String deviceType;
+  String sensorType;
+};
+
+struct MQTTDeviceInfo {
+  String uniqueId;
+  String deviceName;
+  String autoDiscoveryPrefix;
+  String deviceType;
+  String manufacturer;
+};
+
+class MQTTDeviceClassificationFactory {
+ protected:
+  String deviceUniqueId;
 
  public:
-  MQTTSensor(MQTTClient* mqttClient);
-  virtual void setupSensor() = 0;
-  virtual void publishMeasurement() = 0;
-  virtual void reset() = 0;
+  MQTTDeviceClassificationFactory(String deviceUniqueId);
+  virtual MQTTDeviceClassification create() = 0;
+};
+
+class MQTTDevice : public SerialLogger {
+ private:
+  MQTTDeviceInfo deviceInfo;
+  MQTTDeviceClassification deviceClassification;
+  String sensorName;
+  String autoDiscoveryMQTTConfigureTopic;
+  String deviceClass;
+
+  StaticJsonDocument<512> createDeviceInfoJsonObject();
+  void assignDeviceInfos(MQTTDeviceClassification deviceClass, MQTTDeviceInfo deviceInfo);
+  int publishAutoDiscoveryInfo(StaticJsonDocument<512> jsonDocument);
+  bool deregisterDeviceInOrigin();
 
  protected:
-  void publishFloatValue(char* stateTopic, float value);
-  void publishBinaryMessage(char* stateTopic, bool on);
+  String stateTopic;
+  MessageQueueClient* mqttClient;
+
+  int publishJsonDocument(String stateTopic, StaticJsonDocument<512> jsonDocument, bool retain = false);
+  virtual StaticJsonDocument<512> extendAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument);
+
+ public:
+  MQTTDevice(MessageQueueClient* mqttClient, MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo);
+  void configureViaBroker();
+};
+
+class MQTTSensor : public MQTTDevice {
+ protected:
+  bool areEqual(float value1, float value2, float maxDifference = 0.001);
+  void publishFloatValue(float value);
+  void publishBinaryMessage(bool on);
+
+ public:
+  MQTTSensor(MessageQueueClient* mqttClient, MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo);
+  virtual void setupSensor();
+  virtual void publishMeasurement() = 0;
+  virtual void reset();
+};
+
+class MQTTDevicePingDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+ public:
+  MQTTDevicePingDeviceClassificationFactory(String deviceUniqueId);
+  MQTTDeviceClassification create();
+};
+
+class MQTTDevicePing : public MQTTSensor {
+ private:
+  long pingTimeout;
+  unsigned long startTime;
+  bool pingWasSentInLastIteration = false;
+
+  StaticJsonDocument<512> extendAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument);
+
+ public:
+  MQTTDevicePing(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, String uniqueId, long pingTimeout = 60000);
+  void publishMeasurement();
+  void reset();
+};
+
+class MQTTPhotoLightSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+ public:
+  MQTTPhotoLightSensorDeviceClassificationFactory(String deviceUniqueId);
+  MQTTDeviceClassification create();
+};
+
+class MQTTPhotoLightSensor : public MQTTSensor {
+ private:
+  int analogPin;
+  float lastVoltageValue = 0.0;
+
+  StaticJsonDocument<512> extendAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument);
+
+ public:
+  MQTTPhotoLightSensor(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin);
+
+  void publishMeasurement();
+  void reset();
+};
+
+class MQTTMotionSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+ public:
+  MQTTMotionSensorDeviceClassificationFactory(String deviceUniqueId);
+  MQTTDeviceClassification create();
 };
 
 class MQTTMotionSensor : public MQTTSensor {
  private:
-  char* stateTopic;
   int motionSensorPin;
   bool lastMotionSensorState = false;
+  int motionDetectionIterations;
+  int motionDetectionTimeout;
+  int motionDetectedThreshold;
 
  public:
-  MQTTMotionSensor(MQTTClient* mqttClient, char* stateTopic, int motionSensorPin);
+  MQTTMotionSensor(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, String sensorUniqueId, int motionSensorPin,
+                   int motionDetectionIterations = 10, int motionDetectionTimeout = 15, int motionDetectedThreshold = 5);
   void setupSensor();
   void publishMeasurement();
   void reset();
 };
 
-class MQTTDhtSensor : public MQTTSensor {
+class MQTTDHTSensor : public MQTTSensor {
+ private:
+  int currentIteration = 0;
+  int resetValuesIterations;
+
+ protected:
+  DHT* dhtSensor;
+  bool resetIfRequired();
+
+ public:
+  MQTTDHTSensor(MessageQueueClient* mqttClient, MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo, DHT* dhtSensor,
+                int resetValuesIterations = 5000);
+  void setupSensor();
+  virtual void publishMeasurement() = 0;
+  virtual void reset() = 0;
+};
+
+class MQTTTemperatureSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+ public:
+  MQTTTemperatureSensorDeviceClassificationFactory(String deviceUniqueId);
+  MQTTDeviceClassification create();
+};
+
+class MQTTHumiditySensor : public MQTTDHTSensor {
  private:
   DHT* dhtSensor;
-  char* temperatureStateTopic;
-  char* humidityStateTopic;
-  float lastMeasuredTemperature = 0.0;
   float lastMeasuredHumidity = 0.0;
 
-  bool areEqual(float value1, float value2);
-  void publishTemperature();
   void publishHumidity();
 
  public:
-  MQTTDhtSensor(MQTTClient* mqttClient, DHT* dhtSensor, char* temperatureStateTopic, char* humidityStateTopic);
-  void setupSensor();
+  MQTTHumiditySensor(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, DHT* dhtSensor, String sensorUniqueId,
+                     int resetValuesIterations = 5000);
   void publishMeasurement();
   void reset();
+};
+
+class MQTTTemperatureSensor : public MQTTDHTSensor {
+ private:
+  DHT* dhtSensor;
+  float lastMeasuredTemperature = 0.0;
+
+  void publishTemperature();
+
+ public:
+  MQTTTemperatureSensor(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, DHT* dhtSensor, String sensorUniqueId,
+                        int resetValuesIterations = 5000);
+  StaticJsonDocument<512> extendAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument);
+  void publishMeasurement();
+  void reset();
+};
+
+class MQTTHumiditySensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+ public:
+  MQTTHumiditySensorDeviceClassificationFactory(String deviceUniqueId);
+  MQTTDeviceClassification create();
 };
 
 struct MQTTSwitchConfiguration {
@@ -61,27 +197,27 @@ struct MQTTSwitchConfiguration {
   int switchPin;
 };
 
-class MQTTDevice : public SerialLogger {
-  virtual void setupActor(MQTTClient* mqttClient) = 0;
-  virtual bool consumeMessage(MQTTClient* mqttClient, String topic, String payload) = 0;
-  virtual void executeDefaultAction(MQTTClient* mqttClient) = 0;
+class MQTTActor : public SerialLogger {
+  virtual void setupActor(MessageQueueClient* mqttClient) = 0;
+  virtual bool consumeMessage(MessageQueueClient* mqttClient, String topic, String payload) = 0;
+  virtual void executeDefaultAction(MessageQueueClient* mqttClient) = 0;
 };
 
-class MQTTSwitch : public MQTTDevice {
+class MQTTSwitch : public MQTTActor {
  private:
-  char* SWITCH_PAYLOAD_ON = "ON";
-  char* SWITCH_PAYLOAD_OFF = "OFF";
+  String SWITCH_PAYLOAD_ON = "ON";
+  String SWITCH_PAYLOAD_OFF = "OFF";
   MQTTSwitchConfiguration configuration;
-  MQTTClient* mqttClient;
+  MessageQueueClient* mqttClient;
   bool switchOn = false;
 
  public:
   MQTTSwitch(MQTTSwitchConfiguration configuration);
 
-  void setupActor(MQTTClient* mqttClient);
+  void setupActor(MessageQueueClient* mqttClient);
   void applySwitchStatus();
-  bool consumeMessage(MQTTClient* mqttClient, String topic, String payload);
-  void executeDefaultAction(MQTTClient* mqttClient);
+  bool consumeMessage(MessageQueueClient* mqttClient, String topic, String payload);
+  void executeDefaultAction(MessageQueueClient* mqttClient);
 };
 
 struct RGBPins {
@@ -100,7 +236,7 @@ struct MQTTRgbLightConfiguration {
   char* colorSetStateTopic;
 };
 
-class MQTTRgbLight : public MQTTDevice {
+class MQTTRgbLight : public MQTTActor {
  private:
   MQTTRgbLightConfiguration configuration;
   volatile bool stripOn = false;
@@ -109,7 +245,7 @@ class MQTTRgbLight : public MQTTDevice {
   volatile int greenColorPart = 0;
   volatile int blueColorPart = 0;
 
-  void reportStatus(MQTTClient* mqttClient);
+  void reportStatus(MessageQueueClient* mqttClient);
   void processBrightnessPayload(String payload);
   void processColorCommandPayload(String payload);
   bool processIncomingMessage(String topic, String payload);
@@ -117,10 +253,10 @@ class MQTTRgbLight : public MQTTDevice {
  public:
   MQTTRgbLight(MQTTRgbLightConfiguration configuration);
 
-  void setupActor(MQTTClient* mqttClient);
-  bool consumeMessage(MQTTClient* mqttClient, String topic, String payload);
+  void setupActor(MessageQueueClient* mqttClient);
+  bool consumeMessage(MessageQueueClient* mqttClient, String topic, String payload);
   void applyChoosenColorToLeds();
-  void executeDefaultAction(MQTTClient* mqttClient);
+  void executeDefaultAction(MessageQueueClient* mqttClient);
 };
 
 struct WirePinSet {
@@ -146,7 +282,7 @@ struct MQTTI2CRgbLightConfiguration {
   char* colorSetStateTopic;
 };
 
-class MQTTI2CRgbLight : public MQTTDevice {
+class MQTTI2CRgbLight : public MQTTActor {
  private:
   bool stripOn = false;
   int currentBrightness = 0;
@@ -161,17 +297,17 @@ class MQTTI2CRgbLight : public MQTTDevice {
   MQTTI2CRgbLightConfiguration lightConfiguration;
   void sendRGBValuesToSecondary(byte redValue, byte greenValue, byte blueValue, int delayTime = 75);
   void refreshI2CConnection();
-  void reportStatus(MQTTClient* mqttClient);
+  void reportStatus(MessageQueueClient* mqttClient);
   void processColorCommandPayload(String payload);
   bool processIncomingMessage(String topic, String payload);
 
  public:
   MQTTI2CRgbLight(MQTTI2CRgbLightConfiguration lightConfiguration);
-  void setupActor(MQTTClient* mqttClient);
-  bool consumeMessage(MQTTClient* mqttClient, String topic, String payload);
+  void setupActor(MessageQueueClient* mqttClient);
+  bool consumeMessage(MessageQueueClient* mqttClient, String topic, String payload);
   void applyChoosenColorToLeds();
 
-  void executeDefaultAction(MQTTClient* mqttClient);
+  void executeDefaultAction(MessageQueueClient* mqttClient);
 };
 
 #endif
