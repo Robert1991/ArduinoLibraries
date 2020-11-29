@@ -5,43 +5,58 @@ MessageQueueClient::MessageQueueClient(const char* clientName, const char* userN
   this->userName = userName;
   this->password = password;
   this->subscriptionTopicBufferSize = subscriptionTopicBufferSize;
-  subscribeTopicArray = new char*[subscriptionTopicBufferSize];
 }
 
 void MessageQueueClient::setupClient(MQTTClient* mqttClient) {
   this->mqttClient = mqttClient;
-  this->reconnect();
+  this->connectToBroker();
 }
 
 int MessageQueueClient::publishMessage(String topic, String payload, bool retain) {
-  if (!mqttClient->connected()) {
-    this->reconnect();
-    logLineToSerial("Message queue client is connected!");
-  }
-
+  reconnectIfNecassary();
+  logToSerial("Publishing: topic: ");
+  logToSerial(topic);
+  logToSerial(" payload: ");
+  logLineToSerial(payload);
   return mqttClient->publish(topic, payload, retain, 1);
 }
 
-void MessageQueueClient::subscribeTopic(char* topic) {
-  if (!mqttClient->connected()) {
-    this->reconnect();
-    logLineToSerial("Message queue client is connected!");
-  }
+void MessageQueueClient::subscribeTopic(String topic) {
+  reconnectIfNecassary();
+  logToSerial("Subscribing ");
+  logLineToSerial(topic);
   if (subscribeTopicCount < subscriptionTopicBufferSize) {
     subscribeTopicArray[subscribeTopicCount] = topic;
     subscribeTopicCount++;
   }
+  bool subscriptionSuccessful = mqttClient->subscribe(topic);
+  logToSerial("Subscription return status: ");
+  logLineToSerial(subscriptionSuccessful);
 }
 
-void MessageQueueClient::subscribeTopics(char** subscribeTopics, int countOfTopics) {
+void MessageQueueClient::subscribeTopics(String subscribeTopics[], int countOfTopics) {
   for (int i = 0; i < countOfTopics; i++) {
     subscribeTopicArray[subscribeTopicCount] = subscribeTopics[i];
     subscribeTopicCount++;
   }
 }
 
-bool MessageQueueClient::reconnect(int connectTimeout, int reconnectTries) {
-  logToSerial("connecting mqtt client...");
+bool MessageQueueClient::loopClient() {
+  if (reconnectIfNecassary()) {
+    return mqttClient->loop();
+  }
+  return false;
+}
+
+bool MessageQueueClient::reconnectIfNecassary() {
+  if (!mqttClient->connected()) {
+    return this->connectToBroker();
+  }
+  return true;
+}
+
+bool MessageQueueClient::connectToBroker(int connectTimeout, int reconnectTries) {
+  logLineToSerial("connecting mqtt client...");
 
   int currentTry = 0;
   bool connectionEstablished = false;
@@ -65,14 +80,58 @@ bool MessageQueueClient::reconnect(int connectTimeout, int reconnectTries) {
   return connectionEstablished;
 }
 
-bool MessageQueueClient::loopClient() {
-  if (!mqttClient->connected()) {
-    if (this->reconnect()) {
-      return mqttClient->loop();
-    }
-    return false;
+MQTTDeviceService::MQTTDeviceService(MessageQueueClient* messageQueueClient, int mqttPublisherBufferSize, int mqttStateConsumerBufferSize) {
+  this->messageQueueClient = messageQueueClient;
+  this->mqttPublisherBufferSize = mqttPublisherBufferSize;
+  this->mqttStateConsumerBufferSize = mqttStateConsumerBufferSize;
+  this->publishers = new MQTTPublisher*[mqttPublisherBufferSize];
+  this->stateConsumers = new MQTTStateConsumer*[mqttStateConsumerBufferSize];
+}
+
+void MQTTDeviceService::addPublisher(MQTTPublisher* mqttPublisher) {
+  if (mqttPublisherCount < mqttPublisherBufferSize) {
+    publishers[mqttPublisherCount] = mqttPublisher;
+    mqttPublisherCount++;
   }
-  return mqttClient->loop();
+}
+
+void MQTTDeviceService::addStateConsumer(MQTTStateConsumer* stateConsumer) {
+  addPublisher(stateConsumer);
+  if (mqttStateConsumerCount < mqttStateConsumerBufferSize) {
+    stateConsumers[mqttStateConsumerCount] = stateConsumer;
+    mqttStateConsumerCount++;
+  }
+}
+
+void MQTTDeviceService::setupMQTTDevices() {
+  for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
+    publishers[publisherIndex]->initializePublisher(messageQueueClient);
+    publishers[publisherIndex]->configureInTargetPlatform();
+    delay(500);
+  }
+  for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
+    stateConsumers[consumerIndex]->setupSubscriptions();
+    delay(100);
+  }
+}
+
+void MQTTDeviceService::executeLoop() {
+  if (messageQueueClient->loopClient()) {
+    for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
+      publishers[publisherIndex]->publishToTargetPlatform();
+    }
+    for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
+      stateConsumers[consumerIndex]->executeLoopMethod();
+    }
+  }
+}
+
+void MQTTDeviceService::handleMessage(String topic, String payload) {
+  for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
+    if (stateConsumers[consumerIndex]->consumeMessage(topic, payload)) {
+      break;
+    }
+  }
 }
 
 void setupWifiConnection(const char* ssid, const char* password) {

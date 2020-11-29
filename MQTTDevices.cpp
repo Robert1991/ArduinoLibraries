@@ -2,26 +2,29 @@
 
 MQTTDeviceClassificationFactory::MQTTDeviceClassificationFactory(String deviceUniqueId) { this->deviceUniqueId = deviceUniqueId; }
 
-MQTTDevice::MQTTDevice(MessageQueueClient* mqttClient, MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo) {
-  this->mqttClient = mqttClient;
+MQTTDevice::MQTTDevice(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo) {
   MQTTDeviceClassification deviceClass = deviceClassFactory->create();
   assignDeviceInfos(deviceClass, deviceInfo);
 }
 
 void MQTTDevice::assignDeviceInfos(MQTTDeviceClassification deviceClass, MQTTDeviceInfo deviceInfo) {
-  this->sensorName = deviceInfo.deviceName + "_" + deviceClass.sensorType;
-  String sensorHomeAssistantPath = deviceInfo.autoDiscoveryPrefix + "/" + deviceClass.deviceType + "/" + sensorName;
+  this->deviceEntityName = deviceInfo.deviceName + "_" + deviceClass.sensorType;
+  String sensorHomeAssistantPath = deviceInfo.autoDiscoveryPrefix + "/" + deviceClass.deviceType + "/" + deviceEntityName;
   this->stateTopic = sensorHomeAssistantPath + "/state";
   this->autoDiscoveryMQTTConfigureTopic = sensorHomeAssistantPath + "/config";
   this->deviceClassification = deviceClass;
   this->deviceInfo = deviceInfo;
 }
 
-int MQTTDevice::publishAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument) {
+int MQTTDevice::publishAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
   return publishJsonDocument(autoDiscoveryMQTTConfigureTopic, autoConfigureJsonDocument, true);
 }
 
-int MQTTDevice::publishJsonDocument(String stateTopic, StaticJsonDocument<512> jsonDocument, bool retain) {
+int MQTTDevice::publishTo(String topic, String payload, bool retain) { return mqttClient->publishMessage(topic, payload, retain); }
+
+int MQTTDevice::publishState(String stateTopicPayload) { return publishTo(stateTopic, stateTopicPayload); }
+
+int MQTTDevice::publishJsonDocument(String stateTopic, DynamicJsonDocument jsonDocument, bool retain) {
   String jsonMessage;
   serializeJson(jsonDocument, jsonMessage);
   logToSerial("Publishing to: ");
@@ -32,10 +35,15 @@ int MQTTDevice::publishJsonDocument(String stateTopic, StaticJsonDocument<512> j
   return 1;
 }
 
-StaticJsonDocument<512> MQTTDevice::createDeviceInfoJsonObject() {
-  StaticJsonDocument<512> autoConfigureJsonDocument;
-  autoConfigureJsonDocument["name"] = sensorName;
-  autoConfigureJsonDocument["dev_cla"] = deviceClassification.deviceClass;
+void MQTTDevice::subscribeTopic(String subscribeTopic) { return mqttClient->subscribeTopic(subscribeTopic); }
+
+DynamicJsonDocument MQTTDevice::createDeviceInfoJsonObject() {
+  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(12) + 540;
+  DynamicJsonDocument autoConfigureJsonDocument(capacity);
+  autoConfigureJsonDocument["name"] = deviceEntityName;
+  if (deviceClassification.deviceClassIsAvailable) {
+    autoConfigureJsonDocument["dev_cla"] = deviceClassification.deviceClass;
+  }
   autoConfigureJsonDocument["stat_t"] = stateTopic;
   autoConfigureJsonDocument["uniq_id"] = deviceClassification.sensorUniqueId;
   autoConfigureJsonDocument["dev"]["ids"][0] = deviceInfo.uniqueId;
@@ -48,9 +56,9 @@ StaticJsonDocument<512> MQTTDevice::createDeviceInfoJsonObject() {
 void MQTTDevice::configureViaBroker() {
   if (deregisterDeviceInOrigin()) {
     logLineToSerial("Device deregistered!");
-    delay(1500);
+    delay(500);
 
-    StaticJsonDocument<512> autoConfigureJsonDocument = createDeviceInfoJsonObject();
+    DynamicJsonDocument autoConfigureJsonDocument = createDeviceInfoJsonObject();
     autoConfigureJsonDocument = extendAutoDiscoveryInfo(autoConfigureJsonDocument);
     if (publishAutoDiscoveryInfo(autoConfigureJsonDocument)) {
       logLineToSerial("Configure message successfully sent!");
@@ -63,10 +71,18 @@ bool MQTTDevice::deregisterDeviceInOrigin() {
   return mqttClient->publishMessage(autoDiscoveryMQTTConfigureTopic, emptyConfigureMessage, true);
 }
 
-StaticJsonDocument<512> MQTTDevice::extendAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument) { return autoConfigureJsonDocument; }
+DynamicJsonDocument MQTTDevice::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) { return autoConfigureJsonDocument; }
 
-MQTTSensor::MQTTSensor(MessageQueueClient* mqttClient, MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo)
-    : MQTTDevice(mqttClient, deviceClassFactory, deviceInfo) {}
+MQTTSensor::MQTTSensor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo) : MQTTDevice(deviceClassFactory, deviceInfo) {}
+
+void MQTTSensor::initializePublisher(MessageQueueClient* mqttClient) {
+  this->mqttClient = mqttClient;
+  setupSensor();
+}
+
+void MQTTSensor::configureInTargetPlatform() { configureViaBroker(); }
+
+void MQTTSensor::publishToTargetPlatform() { publishMeasurement(); }
 
 void MQTTSensor::publishFloatValue(float floatValue) {
   char result[8];
@@ -99,12 +115,12 @@ MQTTDevicePingDeviceClassificationFactory::MQTTDevicePingDeviceClassificationFac
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTDevicePingDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "connectivity", "binary_sensor", "ping"};
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "connectivity", "binary_sensor", "ping", true};
   return deviceClass;
 }
 
-MQTTDevicePing::MQTTDevicePing(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, String uniqueId, long pingTimeout)
-    : MQTTSensor(mqttClient, new MQTTDevicePingDeviceClassificationFactory(uniqueId), deviceInfo) {
+MQTTDevicePing::MQTTDevicePing(MQTTDeviceInfo deviceInfo, String uniqueId, long pingTimeout)
+    : MQTTSensor(new MQTTDevicePingDeviceClassificationFactory(uniqueId), deviceInfo) {
   this->pingTimeout = pingTimeout;
   startTime = millis();
 }
@@ -123,7 +139,7 @@ void MQTTDevicePing::publishMeasurement() {
   }
 }
 
-StaticJsonDocument<512> MQTTDevicePing::extendAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument) {
+DynamicJsonDocument MQTTDevicePing::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
   int pingTimeoutInSeconds = pingTimeout / 1000;
   autoConfigureJsonDocument["exp_aft"] = 3 * pingTimeoutInSeconds;
   autoConfigureJsonDocument["off_dly"] = pingTimeoutInSeconds + 1;
@@ -136,12 +152,12 @@ MQTTPhotoLightSensorDeviceClassificationFactory::MQTTPhotoLightSensorDeviceClass
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTPhotoLightSensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "voltage", "sensor", "light_intensity"};
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "voltage", "sensor", "light_intensity", true};
   return deviceClass;
 }
 
-MQTTPhotoLightSensor::MQTTPhotoLightSensor(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin)
-    : MQTTSensor(mqttClient, new MQTTPhotoLightSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo) {
+MQTTPhotoLightSensor::MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin)
+    : MQTTSensor(new MQTTPhotoLightSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo) {
   this->analogPin = analogPin;
 }
 
@@ -157,9 +173,8 @@ void MQTTPhotoLightSensor::publishMeasurement() {
   }
 }
 
-StaticJsonDocument<512> MQTTPhotoLightSensor::extendAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument) {
+DynamicJsonDocument MQTTPhotoLightSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
   autoConfigureJsonDocument["unit_of_measurement"] = "V";
-  autoConfigureJsonDocument["expire_after"] = 180;
   return autoConfigureJsonDocument;
 }
 
@@ -169,13 +184,13 @@ MQTTMotionSensorDeviceClassificationFactory::MQTTMotionSensorDeviceClassificatio
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTMotionSensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "motion", "binary_sensor", "motion_detected"};
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "motion", "binary_sensor", "motion_detected", true};
   return deviceClass;
 }
 
-MQTTMotionSensor::MQTTMotionSensor(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, String sensorUniqueId, int motionSensorPin,
-                                   int motionDetectionIterations, int motionDetectionTimeout, int motionDetectedThreshold)
-    : MQTTSensor(mqttClient, new MQTTMotionSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo) {
+MQTTMotionSensor::MQTTMotionSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int motionSensorPin, int motionDetectionIterations,
+                                   int motionDetectionTimeout, int motionDetectedThreshold)
+    : MQTTSensor(new MQTTMotionSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo) {
   this->motionSensorPin = motionSensorPin;
   this->motionDetectionIterations = motionDetectionIterations;
   this->motionDetectionTimeout = motionDetectionTimeout;
@@ -210,9 +225,9 @@ void MQTTMotionSensor::publishMeasurement() {
 
 void MQTTMotionSensor::reset() { lastMotionSensorState = false; }
 
-MQTTDHTSensor::MQTTDHTSensor(MessageQueueClient* mqttClient, MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo,
-                             DHT* dhtSensor, int resetValuesIterations)
-    : MQTTSensor(mqttClient, deviceClassFactory, deviceInfo) {
+MQTTDHTSensor::MQTTDHTSensor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo, DHT* dhtSensor,
+                             int resetValuesIterations)
+    : MQTTSensor(deviceClassFactory, deviceInfo) {
   this->dhtSensor = dhtSensor;
   this->resetValuesIterations = resetValuesIterations;
 }
@@ -236,13 +251,12 @@ MQTTHumiditySensorDeviceClassificationFactory::MQTTHumiditySensorDeviceClassific
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTHumiditySensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "humidity", "sensor", "humidity"};
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "humidity", "sensor", "humidity", true};
   return deviceClass;
 }
 
-MQTTHumiditySensor::MQTTHumiditySensor(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, DHT* dhtSensor, String sensorUniqueId,
-                                       int resetValuesIterations)
-    : MQTTDHTSensor(mqttClient, new MQTTHumiditySensorDeviceClassificationFactory(sensorUniqueId), deviceInfo, dhtSensor, resetValuesIterations) {
+MQTTHumiditySensor::MQTTHumiditySensor(MQTTDeviceInfo deviceInfo, DHT* dhtSensor, String sensorUniqueId, int resetValuesIterations)
+    : MQTTDHTSensor(new MQTTHumiditySensorDeviceClassificationFactory(sensorUniqueId), deviceInfo, dhtSensor, resetValuesIterations) {
   this->dhtSensor = dhtSensor;
 }
 
@@ -253,7 +267,7 @@ void MQTTHumiditySensor::publishMeasurement() {
 
 void MQTTHumiditySensor::publishHumidity() {
   float currentHumiditySensorValue = dhtSensor->readHumidity();
-  if (!isnan(currentHumiditySensorValue)) {
+  if (!isnan(currentHumiditySensorValue) && currentHumiditySensorValue > 0 && currentHumiditySensorValue < 100) {
     if (!areEqual(lastMeasuredHumidity, currentHumiditySensorValue)) {
       logToSerial("Humidity: ");
       logToSerial(currentHumiditySensorValue);
@@ -271,13 +285,12 @@ MQTTTemperatureSensorDeviceClassificationFactory::MQTTTemperatureSensorDeviceCla
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTTemperatureSensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "temperature", "sensor", "temperature"};
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "temperature", "sensor", "temperature", true};
   return deviceClass;
 }
 
-MQTTTemperatureSensor::MQTTTemperatureSensor(MessageQueueClient* mqttClient, MQTTDeviceInfo deviceInfo, DHT* dhtSensor, String sensorUniqueId,
-                                             int resetValuesIterations)
-    : MQTTDHTSensor(mqttClient, new MQTTTemperatureSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo, dhtSensor, resetValuesIterations) {
+MQTTTemperatureSensor::MQTTTemperatureSensor(MQTTDeviceInfo deviceInfo, DHT* dhtSensor, String sensorUniqueId, int resetValuesIterations)
+    : MQTTDHTSensor(new MQTTTemperatureSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo, dhtSensor, resetValuesIterations) {
   this->dhtSensor = dhtSensor;
 }
 
@@ -302,100 +315,158 @@ void MQTTTemperatureSensor::publishTemperature() {
 
 void MQTTTemperatureSensor::reset() { lastMeasuredTemperature = 0.0; }
 
-StaticJsonDocument<512> MQTTTemperatureSensor::extendAutoDiscoveryInfo(StaticJsonDocument<512> autoConfigureJsonDocument) {
+DynamicJsonDocument MQTTTemperatureSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
   autoConfigureJsonDocument["unit_of_measurement"] = "°C";
   autoConfigureJsonDocument["expire_after"] = 300;
   return autoConfigureJsonDocument;
 }
 
-MQTTSwitch::MQTTSwitch(MQTTSwitchConfiguration configuration) {
+MQTTLightSwitchDeviceClassificationFactory::MQTTLightSwitchDeviceClassificationFactory(String deviceUniqueId)
+    : MQTTDeviceClassificationFactory(deviceUniqueId) {}
+
+MQTTDeviceClassification MQTTLightSwitchDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", "relais_switch", false};
+  return deviceClass;
+}
+
+MQTTActor::MQTTActor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo) : MQTTDevice(deviceClassFactory, deviceInfo) {}
+
+void MQTTActor::configureInTargetPlatform() { configureViaBroker(); }
+
+void MQTTActor::initializePublisher(MessageQueueClient* mqttClient) {
   this->mqttClient = mqttClient;
-  this->configuration = configuration;
+  setupActor();
 }
 
-void MQTTSwitch::setupActor(MessageQueueClient* mqttClient) {
-  pinMode(configuration.switchPin, OUTPUT);
-  mqttClient->subscribeTopic(configuration.switchSubscriptionTopic);
-}
+void MQTTActor::publishToTargetPlatform() { reportStatus(); }
 
-void MQTTSwitch::executeDefaultAction(MessageQueueClient* mqttClient) {
-  switchOn = true;
-  mqttClient->publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_OFF);
-  applySwitchStatus();
-}
+void MQTTActor::executeLoopMethod() {}
 
-void MQTTSwitch::applySwitchStatus() {
-  if (switchOn) {
-    digitalWrite(configuration.switchPin, HIGH);
-  } else {
-    digitalWrite(configuration.switchPin, LOW);
+void MQTTActor::reportStatus() {
+  if (actorStatusChanged) {
+    reportStatusInformation();
+    actorStatusChanged = false;
   }
 }
 
-bool MQTTSwitch::consumeMessage(MessageQueueClient* mqttClient, String topic, String payload) {
-  if (topic.equals(configuration.switchSubscriptionTopic)) {
+MQTTSwitch::MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin)
+    : MQTTActor(new MQTTLightSwitchDeviceClassificationFactory(uniqueId), deviceInfo) {
+  this->commandTopic = deviceEntityName + "/" + "switch";
+}
+
+DynamicJsonDocument MQTTSwitch::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+  autoConfigureJsonDocument["cmd_t"] = commandTopic;
+  autoConfigureJsonDocument["ret"] = true;
+  return autoConfigureJsonDocument;
+}
+
+void MQTTSwitch::setupActor() {
+  pinMode(switchPin, OUTPUT);
+  subscribeTopic(commandTopic);
+}
+
+void MQTTSwitch::setupSubscriptions() { subscribeTopic(commandTopic); }
+
+void MQTTSwitch::executeLoopMethod() {
+  if (switchOn) {
+    digitalWrite(switchPin, HIGH);
+  } else {
+    digitalWrite(switchPin, LOW);
+  }
+}
+
+void MQTTSwitch::reportStatusInformation() {
+  if (actorStatusChanged) {
+    if (switchOn) {
+      publishState(SWITCH_PAYLOAD_ON);
+    } else {
+      publishState(SWITCH_PAYLOAD_OFF);
+    }
+  }
+}
+
+bool MQTTSwitch::consumeMessage(String topic, String payload) {
+  if (topic.equals(commandTopic)) {
     if (payload.equals(SWITCH_PAYLOAD_ON)) {
       logLineToSerial("Switch was turned on");
       switchOn = true;
-      mqttClient->publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_ON);
     } else {
       logLineToSerial("Switch was turned off");
       switchOn = false;
-      mqttClient->publishMessage(configuration.switchStateTopic, SWITCH_PAYLOAD_OFF);
     }
-    applySwitchStatus();
+    actorStatusChanged = true;
+    executeLoopMethod();
     return true;
   }
   return false;
 }
 
-MQTTRgbLight::MQTTRgbLight(MQTTRgbLightConfiguration configuration) { this->configuration = configuration; }
+MQTTRgbLightDeviceClassificationFactory::MQTTRgbLightDeviceClassificationFactory(String uniqueId) : MQTTDeviceClassificationFactory(uniqueId) {}
 
-void MQTTRgbLight::setupActor(MessageQueueClient* mqttClient) {
-  pinMode(configuration.pins.red, OUTPUT);
-  pinMode(configuration.pins.green, OUTPUT);
-  pinMode(configuration.pins.blue, OUTPUT);
-  mqttClient->subscribeTopic(configuration.lightSwitchSubscriptionTopic);
-  mqttClient->subscribeTopic(configuration.brightnessSwitchSubscriptionTopic);
-  mqttClient->subscribeTopic(configuration.colorSetSubscriptionTopic);
-  mqttClient->subscribeTopic(configuration.lightStateTopic);
+MQTTDeviceClassification MQTTRgbLightDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", "rgb", false};
+  return deviceClass;
+}
+
+MQTTRgbLight::MQTTRgbLight(MQTTDeviceInfo deviceInfo, String uniqueId, RGBPins pins)
+    : MQTTActor(new MQTTRgbLightDeviceClassificationFactory(uniqueId), deviceInfo) {
+  this->pins = pins;
+  commandTopic = deviceEntityName + "/switch";
+  brightnessCommandTopic = deviceEntityName + "/brightness/set";
+  brightnessStateTopic = deviceEntityName + "/brightness/status";
+  colorCommandTopic = deviceEntityName + "/color/set";
+  colorStateTopic = deviceEntityName + "/color/status";
+}
+
+DynamicJsonDocument MQTTRgbLight::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+  autoConfigureJsonDocument["cmd_t"] = commandTopic;
+  autoConfigureJsonDocument["bri_cmd_t"] = brightnessCommandTopic;
+  autoConfigureJsonDocument["bri_stat_t"] = brightnessStateTopic;
+  autoConfigureJsonDocument["rgb_cmd_t"] = colorCommandTopic;
+  autoConfigureJsonDocument["rgb_stat_t"] = colorStateTopic;
+  autoConfigureJsonDocument["rgb_val_tpl"] = "{{ value_json.rgb | join(',') }}";
+  autoConfigureJsonDocument["stat_val_tpl"] = "{{ value_json.state }}";
+  autoConfigureJsonDocument["ret"] = true;
+  return autoConfigureJsonDocument;
+}
+
+void MQTTRgbLight::setupActor() {
+  pinMode(pins.red, OUTPUT);
+  pinMode(pins.green, OUTPUT);
+  pinMode(pins.blue, OUTPUT);
+}
+
+void MQTTRgbLight::setupSubscriptions() {
+  subscribeTopic(commandTopic);
+  subscribeTopic(brightnessCommandTopic);
+  subscribeTopic(colorCommandTopic);
 }
 
 void MQTTRgbLight::applyChoosenColorToLeds() {
   if (stripOn) {
-    analogWrite(configuration.pins.red, (int)(redColorPart * currentBrightness));
-    analogWrite(configuration.pins.green, (int)(greenColorPart * currentBrightness));
-    analogWrite(configuration.pins.blue, (int)(blueColorPart * currentBrightness));
+    analogWrite(pins.red, (int)(redColorPart * currentBrightness));
+    analogWrite(pins.green, (int)(greenColorPart * currentBrightness));
+    analogWrite(pins.blue, (int)(blueColorPart * currentBrightness));
   } else {
-    analogWrite(configuration.pins.red, LOW);
-    analogWrite(configuration.pins.green, LOW);
-    analogWrite(configuration.pins.blue, LOW);
+    analogWrite(pins.red, LOW);
+    analogWrite(pins.green, LOW);
+    analogWrite(pins.blue, LOW);
   }
 }
 
-void MQTTRgbLight::executeDefaultAction(MessageQueueClient* mqttClient) {
-  currentBrightness = 1.0;
-  redColorPart = 0;
-  greenColorPart = 0;
-  blueColorPart = 0;
-  stripOn = false;
-  reportStatus(mqttClient);
-}
-
-void MQTTRgbLight::reportStatus(MessageQueueClient* mqttClient) {
+void MQTTRgbLight::reportStatusInformation() {
   if (stripOn) {
-    mqttClient->publishMessage(configuration.lightStateTopic, "{\"state\":\"ON\"}", true);
+    publishTo(stateTopic, "{\"state\":\"ON\"}", true);
   } else {
-    mqttClient->publishMessage(configuration.lightStateTopic, "{\"state\":\"OFF\"}", true);
+    publishTo(stateTopic, "{\"state\":\"OFF\"}", true);
   }
   int brightnessValue = (int)(currentBrightness * 255);
-  char brightnessValueStringBuffer[16];
-  itoa(brightnessValue, brightnessValueStringBuffer, 10);
-  mqttClient->publishMessage(configuration.brightnessStateTopic, brightnessValueStringBuffer);
+  String brightnessValueString = String(brightnessValue);
+  publishTo(brightnessStateTopic, brightnessValueString);
 
   char concatination[256];
   sprintf(concatination, "{ \"rgb\":[%i,%i,%i]}", redColorPart, greenColorPart, blueColorPart);
-  mqttClient->publishMessage(configuration.colorSetStateTopic, concatination);
+  publishTo(colorStateTopic, concatination);
 }
 
 void MQTTRgbLight::processBrightnessPayload(String payload) {
@@ -430,7 +501,7 @@ void MQTTRgbLight::processColorCommandPayload(String payload) {
 }
 
 bool MQTTRgbLight::processIncomingMessage(String topic, String payload) {
-  if (topic.equals(configuration.lightSwitchSubscriptionTopic)) {
+  if (topic.equals(commandTopic)) {
     if (payload.equals("ON")) {
       logLineToSerial("Strip was turned on");
       stripOn = true;
@@ -439,28 +510,61 @@ bool MQTTRgbLight::processIncomingMessage(String topic, String payload) {
       stripOn = false;
     }
     return true;
-  } else if (topic.equals(configuration.brightnessSwitchSubscriptionTopic)) {
+  } else if (topic.equals(brightnessCommandTopic)) {
     processBrightnessPayload(payload);
     return true;
-  } else if (topic.equals(configuration.colorSetSubscriptionTopic)) {
+  } else if (topic.equals(colorCommandTopic)) {
     processColorCommandPayload(payload);
     return true;
   }
   return false;
 }
 
-bool MQTTRgbLight::consumeMessage(MessageQueueClient* mqttClient, String topic, String payload) {
-  bool stateChanged = processIncomingMessage(topic, payload);
-  if (stateChanged) {
+bool MQTTRgbLight::consumeMessage(String topic, String payload) {
+  actorStatusChanged = processIncomingMessage(topic, payload);
+  if (actorStatusChanged) {
     applyChoosenColorToLeds();
-    reportStatus(mqttClient);
   }
-  return stateChanged;
+  return actorStatusChanged;
 }
 
-MQTTI2CRgbLight::MQTTI2CRgbLight(MQTTI2CRgbLightConfiguration lightConfiguration) { this->lightConfiguration = lightConfiguration; }
+MQTTI2CRgbLightDeviceClassificationFactory::MQTTI2CRgbLightDeviceClassificationFactory(String uniqueId)
+    : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
-void MQTTI2CRgbLight::executeDefaultAction(MessageQueueClient* mqttClient) {}
+MQTTDeviceClassification MQTTI2CRgbLightDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", "i2c_rgb", false};
+  return deviceClass;
+}
+
+MQTTI2CRgbLight::MQTTI2CRgbLight(MQTTDeviceInfo deviceInfo, String uniqueId, MQTTI2CRgbLightConfiguration lightConfiguration)
+    : MQTTActor(new MQTTI2CRgbLightDeviceClassificationFactory(uniqueId), deviceInfo) {
+  this->lightConfiguration = lightConfiguration;
+  commandTopic = deviceEntityName + "/switch";
+  brightnessCommandTopic = deviceEntityName + "/brightness/set";
+  brightnessStateTopic = deviceEntityName + "/brightness/status";
+  colorCommandTopic = deviceEntityName + "/color/set";
+  colorStateTopic = deviceEntityName + "/color/status";
+}
+
+DynamicJsonDocument MQTTI2CRgbLight::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+  autoConfigureJsonDocument["cmd_t"] = commandTopic;
+  autoConfigureJsonDocument["bri_cmd_t"] = brightnessCommandTopic;
+  autoConfigureJsonDocument["bri_stat_t"] = brightnessStateTopic;
+  autoConfigureJsonDocument["rgb_cmd_t"] = colorCommandTopic;
+  autoConfigureJsonDocument["rgb_stat_t"] = colorStateTopic;
+  autoConfigureJsonDocument["rgb_val_tpl"] = "{{ value_json.rgb | join(',') }}";
+  autoConfigureJsonDocument["stat_val_tpl"] = "{{ value_json.state }}";
+  autoConfigureJsonDocument["ret"] = true;
+  return autoConfigureJsonDocument;
+}
+
+void MQTTI2CRgbLight::setupActor() { establishI2CConnectionTo(lightConfiguration.wirePins.sdaPin, lightConfiguration.wirePins.sclPin, true); }
+
+void MQTTI2CRgbLight::setupSubscriptions() {
+  subscribeTopic(commandTopic);
+  subscribeTopic(brightnessCommandTopic);
+  subscribeTopic(colorCommandTopic);
+}
 
 void MQTTI2CRgbLight::processColorCommandPayload(String payload) {
   char buffer[32];
@@ -500,7 +604,7 @@ void MQTTI2CRgbLight::processColorCommandPayload(String payload) {
 }
 
 bool MQTTI2CRgbLight::processIncomingMessage(String topic, String payload) {
-  if (topic.equals(lightConfiguration.lightSwitchSubscriptionTopic)) {
+  if (topic.equals(commandTopic)) {
     if (payload.equals("ON") && !stripOn || payload.equals("OFF") && stripOn) {
       onOffStatusChanged = true;
       if (payload.equals("ON")) {
@@ -513,7 +617,7 @@ bool MQTTI2CRgbLight::processIncomingMessage(String topic, String payload) {
       return true;
     }
     return false;
-  } else if (topic.equals(lightConfiguration.brightnessSwitchSubscriptionTopic)) {
+  } else if (topic.equals(brightnessCommandTopic)) {
     int requestedBrightness = payload.toInt();
     if (requestedBrightness != currentBrightness) {
       brightnessChanged = true;
@@ -521,43 +625,33 @@ bool MQTTI2CRgbLight::processIncomingMessage(String topic, String payload) {
       return true;
     }
     return false;
-  } else if (topic.equals(lightConfiguration.colorSetSubscriptionTopic)) {
+  } else if (topic.equals(colorCommandTopic)) {
     processColorCommandPayload(payload);
     return colorChanged;
   }
   return false;
 }
 
-void MQTTI2CRgbLight::reportStatus(MessageQueueClient* mqttClient) {
+void MQTTI2CRgbLight::reportStatusInformation() {
   if (stripOn) {
-    mqttClient->publishMessage(lightConfiguration.lightStateTopic, "{\"state\":\"ON\"}");
+    publishTo(stateTopic, "{\"state\":\"ON\"}", true);
   } else {
-    mqttClient->publishMessage(lightConfiguration.lightStateTopic, "{\"state\":\"OFF\"}");
+    publishTo(stateTopic, "{\"state\":\"OFF\"}", true);
   }
-  char brightnessValueStringBuffer[16];
-  itoa(currentBrightness, brightnessValueStringBuffer, 10);
-  mqttClient->publishMessage(lightConfiguration.brightnessStateTopic, brightnessValueStringBuffer);
+  String brightnessValueString = String(currentBrightness);
+  publishTo(brightnessStateTopic, brightnessValueString);
 
   char concatination[256];
   sprintf(concatination, "{ \"rgb\":[%i,%i,%i]}", redColorPart, greenColorPart, blueColorPart);
-  mqttClient->publishMessage(lightConfiguration.colorSetStateTopic, concatination);
+  publishTo(colorStateTopic, concatination);
 }
 
-bool MQTTI2CRgbLight::consumeMessage(MessageQueueClient* mqttClient, String topic, String payload) {
-  bool stateChanged = processIncomingMessage(topic, payload);
-  if (stateChanged) {
-    reportStatus(mqttClient);
+bool MQTTI2CRgbLight::consumeMessage(String topic, String payload) {
+  actorStatusChanged = processIncomingMessage(topic, payload);
+  if (actorStatusChanged) {
     applyChoosenColorToLeds();
   }
-  return stateChanged;
-}
-
-void MQTTI2CRgbLight::setupActor(MessageQueueClient* mqttClient) {
-  establishI2CConnectionTo(lightConfiguration.wirePins.sdaPin, lightConfiguration.wirePins.sclPin, true);
-  mqttClient->subscribeTopic(lightConfiguration.lightSwitchSubscriptionTopic);
-  mqttClient->subscribeTopic(lightConfiguration.brightnessSwitchSubscriptionTopic);
-  mqttClient->subscribeTopic(lightConfiguration.colorSetSubscriptionTopic);
-  mqttClient->subscribeTopic(lightConfiguration.lightStateTopic);
+  return actorStatusChanged;
 }
 
 void MQTTI2CRgbLight::refreshI2CConnection() {

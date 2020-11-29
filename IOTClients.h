@@ -18,20 +18,57 @@ class MessageQueueClient : public SerialLogger {
   const char* clientName;
   const char* userName;
   const char* password;
-  char** subscribeTopicArray;
   int subscribeTopicCount = 0;
   int subscriptionTopicBufferSize = 0;
+  String subscribeTopicArray[SUBSCRIPTION_TOPIC_BUFFER_SIZE];
 
-  bool reconnect(int connectTimeout = 5000, int reconnectTries = 5);
+  bool reconnectIfNecassary();
 
  public:
   MessageQueueClient(const char* clientName, const char* userName, const char* password, int subscriptionTopicBufferSize = 20);
-
   void setupClient(MQTTClient* mqttClient);
+  bool connectToBroker(int connectTimeout = 5000, int reconnectTries = 5);
   int publishMessage(String topic, String payload, bool retain = false);
-  void subscribeTopic(char* topic);
-  void subscribeTopics(char** subscribeTopics, int subscribeTopicCount);
+  void subscribeTopic(String topic);
+  void subscribeTopics(String subscribeTopics[], int subscribeTopicCount);
   bool loopClient();
+};
+
+class MQTTAutoDiscoverDevice {
+ public:
+  virtual void configureInTargetPlatform() = 0;
+};
+
+class MQTTPublisher : public MQTTAutoDiscoverDevice {
+ public:
+  virtual void initializePublisher(MessageQueueClient* mqttClient) = 0;
+  virtual void publishToTargetPlatform() = 0;
+};
+
+class MQTTStateConsumer : public MQTTPublisher {
+ public:
+  virtual bool consumeMessage(String topic, String payload) = 0;
+  virtual void executeLoopMethod() = 0;
+  virtual void setupSubscriptions() = 0;
+};
+
+class MQTTDeviceService : public SerialLogger {
+ private:
+  MessageQueueClient* messageQueueClient;
+  MQTTPublisher** publishers;
+  MQTTStateConsumer** stateConsumers;
+  int mqttPublisherBufferSize = 0;
+  int mqttPublisherCount = 0;
+  int mqttStateConsumerBufferSize = 0;
+  int mqttStateConsumerCount = 0;
+
+ public:
+  MQTTDeviceService(MessageQueueClient* messageQueueClient, int mqttPublisherBufferSize = 10, int mqttStateConsumerBufferSize = 1);
+  void setupMQTTDevices();
+  void addPublisher(MQTTPublisher* mqttPublisher);
+  void addStateConsumer(MQTTStateConsumer* stateConsumer);
+  void executeLoop();
+  void handleMessage(String topic, String payload);
 };
 
 extern unsigned long last_wifi_reconnect_attempt;
