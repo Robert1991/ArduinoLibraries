@@ -321,14 +321,6 @@ DynamicJsonDocument MQTTTemperatureSensor::extendAutoDiscoveryInfo(DynamicJsonDo
   return autoConfigureJsonDocument;
 }
 
-MQTTLightSwitchDeviceClassificationFactory::MQTTLightSwitchDeviceClassificationFactory(String deviceUniqueId)
-    : MQTTDeviceClassificationFactory(deviceUniqueId) {}
-
-MQTTDeviceClassification MQTTLightSwitchDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", "relais_switch", false};
-  return deviceClass;
-}
-
 MQTTActor::MQTTActor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo) : MQTTDevice(deviceClassFactory, deviceInfo) {}
 
 void MQTTActor::configureInTargetPlatform() { configureViaBroker(); }
@@ -349,9 +341,20 @@ void MQTTActor::reportStatus() {
   }
 }
 
-MQTTSwitch::MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin)
-    : MQTTActor(new MQTTLightSwitchDeviceClassificationFactory(uniqueId), deviceInfo) {
+MQTTLightSwitchDeviceClassificationFactory::MQTTLightSwitchDeviceClassificationFactory(String deviceUniqueId, String deviceName)
+    : MQTTDeviceClassificationFactory(deviceUniqueId) {
+  this->deviceName = deviceName;
+}
+
+MQTTDeviceClassification MQTTLightSwitchDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", deviceName, false};
+  return deviceClass;
+}
+
+MQTTSwitch::MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName)
+    : MQTTActor(new MQTTLightSwitchDeviceClassificationFactory(uniqueId, deviceName), deviceInfo) {
   this->commandTopic = deviceEntityName + "/" + "switch";
+  this->switchPin = switchPin;
 }
 
 DynamicJsonDocument MQTTSwitch::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {

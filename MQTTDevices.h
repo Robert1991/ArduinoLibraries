@@ -214,8 +214,11 @@ class MQTTActor : public MQTTDevice, public MQTTStateConsumer {
 };
 
 class MQTTLightSwitchDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+ private:
+  String deviceName;
+
  public:
-  MQTTLightSwitchDeviceClassificationFactory(String deviceUniqueId);
+  MQTTLightSwitchDeviceClassificationFactory(String deviceUniqueId, String deviceName);
   MQTTDeviceClassification create();
 };
 
@@ -229,7 +232,7 @@ class MQTTSwitch : public MQTTActor {
   void reportStatusInformation();
 
  public:
-  MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin);
+  MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName = "relais_switch");
 
   DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
   void setupActor();
