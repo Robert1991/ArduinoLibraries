@@ -63,6 +63,7 @@ bool MessageQueueClient::connectToBroker(int connectTimeout, int reconnectTries)
   while (!mqttClient->connect(clientName, userName, password) && (currentTry < reconnectTries)) {
     logLineToSerial("Connection attemp failed. Reconnecting...");
     currentTry++;
+    delay(2000);
   }
   if (currentTry >= reconnectTries) {
     return false;
