@@ -137,7 +137,6 @@ void MQTTDevicePing::publishMeasurement() {
 
 DynamicJsonDocument MQTTDevicePing::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
   int pingTimeoutInSeconds = pingTimeout / 1000;
-  autoConfigureJsonDocument["exp_aft"] = 3 * pingTimeoutInSeconds;
   autoConfigureJsonDocument["off_dly"] = pingTimeoutInSeconds * 2 + 1;
   return autoConfigureJsonDocument;
 }
