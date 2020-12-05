@@ -27,7 +27,7 @@ class MessageQueueClient : public SerialLogger {
  public:
   MessageQueueClient(const char* clientName, const char* userName, const char* password, int subscriptionTopicBufferSize = 20);
   void setupClient(MQTTClient* mqttClient);
-  bool connectToBroker(int connectTimeout = 5000, int reconnectTries = 5);
+  bool connectToBroker(int connectTimeout = 2500, int reconnectTries = 5);
   int publishMessage(String topic, String payload, bool retain = false);
   void subscribeTopic(String topic);
   void subscribeTopics(String subscribeTopics[], int subscribeTopicCount);

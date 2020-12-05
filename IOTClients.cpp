@@ -57,18 +57,18 @@ bool MessageQueueClient::reconnectIfNecassary() {
 
 bool MessageQueueClient::connectToBroker(int connectTimeout, int reconnectTries) {
   logLineToSerial("connecting mqtt client...");
-
   int currentTry = 0;
-  bool connectionEstablished = false;
   while (!mqttClient->connect(clientName, userName, password) && (currentTry < reconnectTries)) {
     logLineToSerial("Connection attemp failed. Reconnecting...");
     currentTry++;
-    delay(2000);
+    delay(connectTimeout);
   }
   if (currentTry >= reconnectTries) {
     return false;
-  }
-  if (connectionEstablished) {
+  } else {
+    logToSerial("Subscribing again to topic count: ");
+    logLineToSerial(subscribeTopicCount);
+
     for (int i = 0; i < subscribeTopicCount; i++) {
       logToSerial("Subscribing: ");
       logLineToSerial(subscribeTopicArray[i]);
@@ -77,8 +77,8 @@ bool MessageQueueClient::connectToBroker(int connectTimeout, int reconnectTries)
       logLineToSerial(subscriptionSuccessful);
     }
     loopClient();
+    return true;
   }
-  return connectionEstablished;
 }
 
 MQTTDeviceService::MQTTDeviceService(MessageQueueClient* messageQueueClient, int mqttPublisherBufferSize, int mqttStateConsumerBufferSize) {
