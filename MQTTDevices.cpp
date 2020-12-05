@@ -527,8 +527,7 @@ bool MQTTRgbLight::consumeMessage(String topic, String payload) {
   return actorStatusChanged;
 }
 
-MQTTI2CRgbLightDeviceClassificationFactory::MQTTI2CRgbLightDeviceClassificationFactory(String uniqueId)
-    : MQTTDeviceClassificationFactory(deviceUniqueId) {}
+MQTTI2CRgbLightDeviceClassificationFactory::MQTTI2CRgbLightDeviceClassificationFactory(String uniqueId) : MQTTDeviceClassificationFactory(uniqueId) {}
 
 MQTTDeviceClassification MQTTI2CRgbLightDeviceClassificationFactory::create() {
   MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", "i2c_rgb", false};
