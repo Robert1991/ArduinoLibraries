@@ -43,6 +43,7 @@ class MQTTPublisher : public MQTTAutoDiscoverDevice {
  public:
   virtual void initializePublisher(MessageQueueClient* mqttClient) = 0;
   virtual void publishToTargetPlatform() = 0;
+  virtual void reset() = 0;
 };
 
 class MQTTStateConsumer : public MQTTPublisher {
@@ -57,6 +58,7 @@ class MQTTDeviceService : public SerialLogger {
   MessageQueueClient* messageQueueClient;
   MQTTPublisher** publishers;
   MQTTStateConsumer** stateConsumers;
+  MQTTStateConsumer* resetStateConsumer;
   int mqttPublisherBufferSize = 0;
   int mqttPublisherCount = 0;
   int mqttStateConsumerBufferSize = 0;
@@ -64,6 +66,7 @@ class MQTTDeviceService : public SerialLogger {
 
  public:
   MQTTDeviceService(MessageQueueClient* messageQueueClient, int mqttPublisherBufferSize = 10, int mqttStateConsumerBufferSize = 1);
+  void setResetStateConsumer(MQTTStateConsumer* resetStateConsumer);
   void setupMQTTDevices();
   void addPublisher(MQTTPublisher* mqttPublisher);
   void addStateConsumer(MQTTStateConsumer* stateConsumer);

@@ -89,6 +89,8 @@ MQTTDeviceService::MQTTDeviceService(MessageQueueClient* messageQueueClient, int
   this->stateConsumers = new MQTTStateConsumer*[mqttStateConsumerBufferSize];
 }
 
+void MQTTDeviceService::setResetStateConsumer(MQTTStateConsumer* resetStateConsumer) { this->resetStateConsumer = resetStateConsumer; }
+
 void MQTTDeviceService::addPublisher(MQTTPublisher* mqttPublisher) {
   if (mqttPublisherCount < mqttPublisherBufferSize) {
     publishers[mqttPublisherCount] = mqttPublisher;
@@ -114,6 +116,11 @@ void MQTTDeviceService::setupMQTTDevices() {
     stateConsumers[consumerIndex]->setupSubscriptions();
     delay(100);
   }
+  if (resetStateConsumer) {
+    resetStateConsumer->initializePublisher(messageQueueClient);
+    resetStateConsumer->configureInTargetPlatform();
+    resetStateConsumer->setupSubscriptions();
+  }
 }
 
 void MQTTDeviceService::executeLoop() {
@@ -131,6 +138,15 @@ void MQTTDeviceService::handleMessage(String topic, String payload) {
   for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
     if (stateConsumers[consumerIndex]->consumeMessage(topic, payload)) {
       break;
+    }
+  }
+  if (resetStateConsumer) {
+    if (resetStateConsumer->consumeMessage(topic, payload)) {
+      logLineToSerial("Resetting device sensor/actor states");
+      for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
+        publishers[publisherIndex]->reset();
+      }
+      resetStateConsumer->reset();
     }
   }
 }

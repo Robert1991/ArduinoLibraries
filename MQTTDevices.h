@@ -60,6 +60,7 @@ class MQTTDevice : public SerialLogger {
  public:
   MQTTDevice(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo);
   void configureViaBroker();
+  virtual void reset() = 0;
 };
 
 class MQTTSensor : public MQTTDevice, public MQTTPublisher {
@@ -75,7 +76,6 @@ class MQTTSensor : public MQTTDevice, public MQTTPublisher {
   void publishToTargetPlatform();
   virtual void setupSensor();
   virtual void publishMeasurement() = 0;
-  virtual void reset();
 };
 
 class MQTTDevicePingDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
@@ -209,16 +209,18 @@ class MQTTActor : public MQTTDevice, public MQTTStateConsumer {
   void initializePublisher(MessageQueueClient* mqttClient);
   void configureInTargetPlatform();
   void publishToTargetPlatform();
+  void reset();
   virtual void setupActor() = 0;
   virtual void executeLoopMethod();
 };
 
-class MQTTLightSwitchDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+class MQTTSwitchDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
  private:
   String deviceName;
+  String deviceType;
 
  public:
-  MQTTLightSwitchDeviceClassificationFactory(String deviceUniqueId, String deviceName);
+  MQTTSwitchDeviceClassificationFactory(String deviceUniqueId, String deviceType, String deviceName);
   MQTTDeviceClassification create();
 };
 
@@ -227,18 +229,26 @@ class MQTTSwitch : public MQTTActor {
   String SWITCH_PAYLOAD_ON = "ON";
   String SWITCH_PAYLOAD_OFF = "OFF";
   int switchPin;
-  bool switchOn = false;
 
+ protected:
+  bool switchOn = false;
   void reportStatusInformation();
 
  public:
-  MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName = "relais_switch");
+  MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName = "relais_switch", String deviceType = "light");
 
   DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
-  void setupActor();
+  virtual void setupActor();
+  virtual void executeLoopMethod();
   void setupSubscriptions();
-  void executeLoopMethod();
   bool consumeMessage(String topic, String payload);
+};
+
+class MQTTDeviceResetSwitch : public MQTTSwitch {
+ public:
+  MQTTDeviceResetSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, String deviceName = "reset_switch");
+  void executeLoopMethod();
+  void setupActor();
 };
 
 struct RGBPins {

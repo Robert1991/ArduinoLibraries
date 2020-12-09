@@ -102,8 +102,6 @@ void MQTTSensor::publishBinaryMessage(bool on) {
 
 void MQTTSensor::setupSensor() {}
 
-void MQTTSensor::reset() {}
-
 bool MQTTSensor::areEqual(float value1, float value2, float maxDifference) {
   if (fabs(value1 - value2) > maxDifference) {
     return false;
@@ -122,7 +120,8 @@ MQTTDeviceClassification MQTTDevicePingDeviceClassificationFactory::create() {
 MQTTDevicePing::MQTTDevicePing(MQTTDeviceInfo deviceInfo, String uniqueId, long pingTimeout)
     : MQTTSensor(new MQTTDevicePingDeviceClassificationFactory(uniqueId), deviceInfo) {
   this->pingTimeout = pingTimeout;
-  startTime = millis();
+  // We want an immediate ping
+  startTime = millis() + pingTimeout + 1;
 }
 
 void MQTTDevicePing::publishMeasurement() {
@@ -141,7 +140,7 @@ DynamicJsonDocument MQTTDevicePing::extendAutoDiscoveryInfo(DynamicJsonDocument 
   return autoConfigureJsonDocument;
 }
 
-void MQTTDevicePing::reset() { startTime = 0; }
+void MQTTDevicePing::reset() { startTime = millis() + pingTimeout + 1; }
 
 MQTTPhotoLightSensorDeviceClassificationFactory::MQTTPhotoLightSensorDeviceClassificationFactory(String deviceUniqueId)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
@@ -160,7 +159,7 @@ void MQTTPhotoLightSensor::publishMeasurement() {
   int sensorValue = analogRead(A0);
   float currentVoltage = sensorValue * (3.3 / 1023.0);
 
-  if (!areEqual(lastVoltageValue, currentVoltage, 0.1)) {
+  if (!areEqual(lastVoltageValue, currentVoltage, 0.2)) {
     lastVoltageValue = currentVoltage;
     logToSerial("light sensitivity voltage output changed to: ");
     logLineToSerial(lastVoltageValue);
@@ -336,18 +335,21 @@ void MQTTActor::reportStatus() {
   }
 }
 
-MQTTLightSwitchDeviceClassificationFactory::MQTTLightSwitchDeviceClassificationFactory(String deviceUniqueId, String deviceName)
+void MQTTActor::reset() { actorStatusChanged = true; }
+
+MQTTSwitchDeviceClassificationFactory::MQTTSwitchDeviceClassificationFactory(String deviceUniqueId, String deviceName, String deviceType)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {
   this->deviceName = deviceName;
+  this->deviceType = deviceType;
 }
 
-MQTTDeviceClassification MQTTLightSwitchDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", deviceName, false};
+MQTTDeviceClassification MQTTSwitchDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "", deviceType, deviceName, false};
   return deviceClass;
 }
 
-MQTTSwitch::MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName)
-    : MQTTActor(new MQTTLightSwitchDeviceClassificationFactory(uniqueId, deviceName), deviceInfo) {
+MQTTSwitch::MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName, String deviceType)
+    : MQTTActor(new MQTTSwitchDeviceClassificationFactory(uniqueId, deviceName, deviceType), deviceInfo) {
   this->commandTopic = deviceEntityName + "/" + "switch";
   this->switchPin = switchPin;
 }
@@ -358,10 +360,7 @@ DynamicJsonDocument MQTTSwitch::extendAutoDiscoveryInfo(DynamicJsonDocument auto
   return autoConfigureJsonDocument;
 }
 
-void MQTTSwitch::setupActor() {
-  pinMode(switchPin, OUTPUT);
-  subscribeTopic(commandTopic);
-}
+void MQTTSwitch::setupActor() { pinMode(switchPin, OUTPUT); }
 
 void MQTTSwitch::setupSubscriptions() { subscribeTopic(commandTopic); }
 
@@ -397,6 +396,19 @@ bool MQTTSwitch::consumeMessage(String topic, String payload) {
     return true;
   }
   return false;
+}
+
+MQTTDeviceResetSwitch::MQTTDeviceResetSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, String deviceName)
+    : MQTTSwitch(deviceInfo, uniqueId, 0, deviceName, "switch") {}
+
+void MQTTDeviceResetSwitch::setupActor() {}
+
+void MQTTDeviceResetSwitch::executeLoopMethod() {
+  if (switchOn) {
+    switchOn = false;
+    reportStatusInformation();
+    delay(100);
+  }
 }
 
 MQTTRgbLightDeviceClassificationFactory::MQTTRgbLightDeviceClassificationFactory(String uniqueId) : MQTTDeviceClassificationFactory(uniqueId) {}
