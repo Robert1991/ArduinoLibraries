@@ -159,7 +159,7 @@ void MQTTPhotoLightSensor::publishMeasurement() {
   int sensorValue = analogRead(A0);
   float currentVoltage = sensorValue * (3.3 / 1023.0);
 
-  if (!areEqual(lastVoltageValue, currentVoltage, 0.2)) {
+  if (!areEqual(lastVoltageValue, currentVoltage, 0.1)) {
     lastVoltageValue = currentVoltage;
     logToSerial("light sensitivity voltage output changed to: ");
     logLineToSerial(lastVoltageValue);
