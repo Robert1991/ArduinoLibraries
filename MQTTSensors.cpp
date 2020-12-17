@@ -20,7 +20,6 @@ void MQTTDevicePing::publishMeasurement() {
   if (currentTime - startTime > pingTimeout) {
     publishBinaryMessage(true);
     logLineToSerial("Ping published!");
-    pingWasSentInLastIteration = true;
     startTime = millis();
   }
 }
@@ -32,6 +31,41 @@ DynamicJsonDocument MQTTDevicePing::extendAutoDiscoveryInfo(DynamicJsonDocument 
 }
 
 void MQTTDevicePing::reset() { startTime = millis() + pingTimeout + 1; }
+
+MQTTDoorSensorDeviceClassificationFactory::MQTTDoorSensorDeviceClassificationFactory(String deviceUniqueId)
+    : MQTTDeviceClassificationFactory(deviceUniqueId) {}
+
+MQTTDeviceClassification MQTTDoorSensorDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "door", "binary_sensor", "door_open", true};
+  return deviceClass;
+}
+
+MQTTDoorSensor::MQTTDoorSensor(MQTTDeviceInfo deviceInfo, String uniqueId, int doorSensorPin)
+    : MQTTSensor(new MQTTDoorSensorDeviceClassificationFactory(uniqueId), deviceInfo) {
+  this->doorSensorPin = doorSensorPin;
+}
+
+void MQTTDoorSensor::setupSensor() { pinMode(doorSensorPin, INPUT_PULLUP); }
+
+void MQTTDoorSensor::publishMeasurement() {
+  int doorState = digitalRead(doorSensorPin);
+
+  if (doorState == HIGH && !doorIsOpen) {
+    doorIsOpen = true;
+    publishBinaryMessage(true);
+  } else if (doorState == LOW && doorIsOpen) {
+    doorIsOpen = false;
+    publishBinaryMessage(false);
+  }
+}
+
+void MQTTDoorSensor::reset() {
+  if (doorIsOpen) {
+    doorIsOpen = false;
+  } else {
+    doorIsOpen = true;
+  }
+}
 
 MQTTPhotoLightSensorDeviceClassificationFactory::MQTTPhotoLightSensorDeviceClassificationFactory(String deviceUniqueId)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}

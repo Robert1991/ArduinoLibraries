@@ -24,6 +24,24 @@ class MQTTDevicePing : public MQTTSensor {
   void reset();
 };
 
+class MQTTDoorSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+ public:
+  MQTTDoorSensorDeviceClassificationFactory(String deviceUniqueId);
+  MQTTDeviceClassification create();
+};
+
+class MQTTDoorSensor : public MQTTSensor {
+ private:
+  bool doorIsOpen = false;
+  int doorSensorPin;
+
+ public:
+  MQTTDoorSensor(MQTTDeviceInfo deviceInfo, String uniqueId, int doorSensorPin);
+  void setupSensor();
+  void publishMeasurement();
+  void reset();
+};
+
 class MQTTPhotoLightSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
  public:
   MQTTPhotoLightSensorDeviceClassificationFactory(String deviceUniqueId);
