@@ -33,12 +33,13 @@ class MQTTPhotoLightSensorDeviceClassificationFactory : public MQTTDeviceClassif
 class MQTTPhotoLightSensor : public MQTTSensor {
  private:
   int analogPin;
+  float sensorVoltage;
   float lastVoltageValue = 0.0;
 
   DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
 
  public:
-  MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin);
+  MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin, float sensorVoltage = 3.3);
 
   void publishMeasurement();
   void reset();

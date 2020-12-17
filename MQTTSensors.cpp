@@ -41,14 +41,15 @@ MQTTDeviceClassification MQTTPhotoLightSensorDeviceClassificationFactory::create
   return deviceClass;
 }
 
-MQTTPhotoLightSensor::MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin)
+MQTTPhotoLightSensor::MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin, float sensorVoltage)
     : MQTTSensor(new MQTTPhotoLightSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo) {
   this->analogPin = analogPin;
+  this->sensorVoltage = sensorVoltage;
 }
 
 void MQTTPhotoLightSensor::publishMeasurement() {
   int sensorValue = analogRead(A0);
-  float currentVoltage = sensorValue * (3.3 / 1023.0);
+  float currentVoltage = sensorValue * (sensorVoltage / 1023.0);
 
   if (!areEqual(lastVoltageValue, currentVoltage, 0.1)) {
     lastVoltageValue = currentVoltage;
@@ -63,7 +64,7 @@ DynamicJsonDocument MQTTPhotoLightSensor::extendAutoDiscoveryInfo(DynamicJsonDoc
   return autoConfigureJsonDocument;
 }
 
-void MQTTPhotoLightSensor::reset() { lastVoltageValue = 0.0; }
+void MQTTPhotoLightSensor::reset() { lastVoltageValue = -1.0; }
 
 MQTTMotionSensorDeviceClassificationFactory::MQTTMotionSensorDeviceClassificationFactory(String deviceUniqueId)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
