@@ -237,6 +237,5 @@ void MQTTTemperatureSensor::reset() { lastMeasuredTemperature = 0.0; }
 
 DynamicJsonDocument MQTTTemperatureSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
   autoConfigureJsonDocument["unit_of_measurement"] = "°C";
-  autoConfigureJsonDocument["expire_after"] = 300;
   return autoConfigureJsonDocument;
 }
