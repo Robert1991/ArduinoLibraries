@@ -4,7 +4,7 @@
 #include <Wire.h>
 
 #include "Arduino.h"
-#include "hardwareSerial.h"
+
 
 // see http://www.forward.com.au/pfod/ArduinoProgramming/I2C_ClearBus/index.html
 int clearI2CBus(int sdaPin, int sclPin, bool startupDelay = false);
