@@ -75,35 +75,38 @@ void MQTTDoorSensor::reset() {
   }
 }
 
-MQTTPhotoLightSensorDeviceClassificationFactory::MQTTPhotoLightSensorDeviceClassificationFactory(String deviceUniqueId)
+MQTTPhotoLightSensorDeviceClassificationFactory::MQTTPhotoLightSensorDeviceClassificationFactory(
+    String deviceUniqueId)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTPhotoLightSensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "voltage", "sensor", "light_intensity", true};
-  return deviceClass;
+    MQTTDeviceClassification deviceClass = {deviceUniqueId, "voltage", "sensor", "light_intensity", true};
+    return deviceClass;
 }
 
-MQTTPhotoLightSensor::MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin, float sensorVoltage)
+MQTTPhotoLightSensor::MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin,
+                                           float sensorVoltage)
     : MQTTSensor(new MQTTPhotoLightSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo) {
-  this->analogPin = analogPin;
-  this->sensorVoltage = sensorVoltage;
+    this->analogPin = analogPin;
+    this->sensorVoltage = sensorVoltage;
 }
 
 void MQTTPhotoLightSensor::publishMeasurement() {
-  int sensorValue = analogRead(A0);
-  float currentVoltage = sensorValue * (sensorVoltage / 1023.0);
+    int sensorValue = analogRead(analogPin);
+    float currentVoltage = sensorValue * (sensorVoltage / 1023.0);
 
-  if (!areEqual(lastVoltageValue, currentVoltage, 0.1)) {
-    lastVoltageValue = currentVoltage;
-    logToSerial("light sensitivity voltage output changed to: ");
-    logLineToSerial(lastVoltageValue);
-    publishFloatValue(lastVoltageValue);
-  }
+    if (!areEqual(lastVoltageValue, currentVoltage, 0.1)) {
+        lastVoltageValue = currentVoltage;
+        logToSerial("light sensitivity voltage output changed to: ");
+        logLineToSerial(lastVoltageValue);
+        publishFloatValue(lastVoltageValue);
+    }
 }
 
-DynamicJsonDocument MQTTPhotoLightSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
-  autoConfigureJsonDocument["unit_of_measurement"] = "V";
-  return autoConfigureJsonDocument;
+DynamicJsonDocument
+MQTTPhotoLightSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+    autoConfigureJsonDocument["unit_of_meas"] = "V";
+    return autoConfigureJsonDocument;
 }
 
 void MQTTPhotoLightSensor::reset() { lastVoltageValue = -1.0; }

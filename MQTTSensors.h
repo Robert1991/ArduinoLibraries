@@ -45,25 +45,28 @@ class MQTTDoorSensor : public MQTTSensor {
   void reset();
 };
 
-class MQTTPhotoLightSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
- public:
-  MQTTPhotoLightSensorDeviceClassificationFactory(String deviceUniqueId);
-  MQTTDeviceClassification create();
+class MQTTPhotoLightSensorDeviceClassificationFactory
+    : public MQTTDeviceClassificationFactory {
+  public:
+    MQTTPhotoLightSensorDeviceClassificationFactory(String deviceUniqueId);
+    MQTTDeviceClassification create();
 };
 
 class MQTTPhotoLightSensor : public MQTTSensor {
- private:
-  int analogPin;
-  float sensorVoltage;
-  float lastVoltageValue = 0.0;
+  private:
+    int analogPin;
+    float sensorVoltage;
+    float lastVoltageValue = 0.0;
 
-  DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+    DynamicJsonDocument
+    extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
 
- public:
-  MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin, float sensorVoltage = 3.3);
+  public:
+    MQTTPhotoLightSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin,
+                         float sensorVoltage = 3.3);
 
-  void publishMeasurement();
-  void reset();
+    void publishMeasurement();
+    void reset();
 };
 
 class MQTTMotionSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
