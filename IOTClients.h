@@ -2,12 +2,8 @@
 #define IOTClients_h
 
 #include "SerialLogger.h"
+#include <ESP8266WiFi.h>
 #include <MQTT.h>
-#include <WiFiUtils.h>
-
-extern "C" {
-#include "user_interface.h"
-}
 
 #define SUBSCRIPTION_TOPIC_BUFFER_SIZE 20
 

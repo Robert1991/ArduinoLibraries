@@ -3,7 +3,6 @@
 
 #include <AccessPointWebServer.h>
 #include <DeviceRootConfig.h>
-#include <WiFiUtils.h>
 
 extern DeviceRootConfig *rootConfig;
 extern MQTTDeviceInfo deviceInfo;

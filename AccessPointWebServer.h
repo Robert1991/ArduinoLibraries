@@ -4,9 +4,7 @@
 #include "SerialLogger.h"
 #include <DeviceRootConfig.h>
 #include <ESP8266WebServer.h>
-#include <ESP8266WiFi.h>
-#include <IOTClients.h>
-#include <MQTT.h>
+#include <WiFiUtils.h>
 
 const String SIDE_NOT_FOUND = "<!DOCTYPE html>"
                               "<html lang=\"en\">"
