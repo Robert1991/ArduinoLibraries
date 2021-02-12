@@ -2,8 +2,8 @@
 #define DeviceRuntime_h
 
 #include <AccessPointWebServer.h>
-#include <DNSServer.h>
 #include <DeviceRootConfig.h>
+#include <WiFiUtils.h>
 
 extern DeviceRootConfig *rootConfig;
 extern MQTTDeviceInfo deviceInfo;

@@ -1,11 +1,9 @@
 #ifndef IOTClients_h
 #define IOTClients_h
 
-#include <DNSServer.h>
-#include <ESP8266WiFi.h>
-#include <MQTT.h>
-
 #include "SerialLogger.h"
+#include <MQTT.h>
+#include <WiFiUtils.h>
 
 extern "C" {
 #include "user_interface.h"
@@ -81,15 +79,5 @@ class MQTTDeviceService : public SerialLogger {
     void executeLoop();
     void handleMessage(String topic, String payload);
 };
-
-extern unsigned long last_wifi_reconnect_attempt;
-extern unsigned long last_mqtt_reconnect_attempt;
-
-void setupWifiConnection(const String ssid, const String password, const String hostname = "",
-                         WiFiMode wifiMode = WIFI_STA);
-DNSServer setupSoftAccessPointWithDnsServer(String ssid, String domainName);
-void checkWifiStatus(const String ssid, const String password, const String hostname = "");
-void displayFreeRam();
-boolean testWifiConnection(const String ssid, const String password, int maxTries = 5);
 
 #endif
