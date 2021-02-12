@@ -54,24 +54,25 @@ class MQTTStateConsumer : public MQTTPublisher {
 };
 
 class MQTTDeviceService : public SerialLogger {
- private:
-  MessageQueueClient* messageQueueClient;
-  MQTTPublisher** publishers;
-  MQTTStateConsumer** stateConsumers;
-  MQTTStateConsumer* resetStateConsumer;
-  int mqttPublisherBufferSize = 0;
-  int mqttPublisherCount = 0;
-  int mqttStateConsumerBufferSize = 0;
-  int mqttStateConsumerCount = 0;
+  private:
+    MessageQueueClient *messageQueueClient;
+    MQTTPublisher **publishers;
+    MQTTStateConsumer **stateConsumers;
+    MQTTStateConsumer *resetStateConsumer;
+    int mqttPublisherBufferSize = 0;
+    int mqttPublisherCount = 0;
+    int mqttStateConsumerBufferSize = 0;
+    int mqttStateConsumerCount = 0;
 
- public:
-  MQTTDeviceService(MessageQueueClient* messageQueueClient, int mqttPublisherBufferSize = 10, int mqttStateConsumerBufferSize = 1);
-  void setResetStateConsumer(MQTTStateConsumer* resetStateConsumer);
-  void setupMQTTDevices();
-  void addPublisher(MQTTPublisher* mqttPublisher);
-  void addStateConsumer(MQTTStateConsumer* stateConsumer);
-  void executeLoop();
-  void handleMessage(String topic, String payload);
+  public:
+    MQTTDeviceService(MessageQueueClient *messageQueueClient, int mqttPublisherBufferSize = 10,
+                      int mqttStateConsumerBufferSize = 1);
+    void setResetStateConsumer(MQTTStateConsumer *resetStateConsumer);
+    void setupMQTTDevices();
+    void addPublisher(MQTTPublisher *mqttPublisher);
+    void addStateConsumer(MQTTStateConsumer *stateConsumer);
+    void executeLoop();
+    void handleMessage(String topic, String payload);
 };
 
 extern unsigned long last_wifi_reconnect_attempt;

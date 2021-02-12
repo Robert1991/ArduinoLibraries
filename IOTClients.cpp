@@ -91,64 +91,77 @@ MQTTDeviceService::MQTTDeviceService(MessageQueueClient* messageQueueClient, int
 
 void MQTTDeviceService::setResetStateConsumer(MQTTStateConsumer* resetStateConsumer) { this->resetStateConsumer = resetStateConsumer; }
 
-void MQTTDeviceService::addPublisher(MQTTPublisher* mqttPublisher) {
-  if (mqttPublisherCount < mqttPublisherBufferSize) {
-    publishers[mqttPublisherCount] = mqttPublisher;
-    mqttPublisherCount++;
-  }
+MQTTDeviceService::MQTTDeviceService(MessageQueueClient *messageQueueClient, int mqttPublisherBufferSize,
+                                     int mqttStateConsumerBufferSize) {
+    this->messageQueueClient = messageQueueClient;
+    this->mqttPublisherBufferSize = mqttPublisherBufferSize;
+    this->mqttStateConsumerBufferSize = mqttStateConsumerBufferSize;
+    this->publishers = new MQTTPublisher *[mqttPublisherBufferSize];
+    this->stateConsumers = new MQTTStateConsumer *[mqttStateConsumerBufferSize];
 }
 
-void MQTTDeviceService::addStateConsumer(MQTTStateConsumer* stateConsumer) {
-  addPublisher(stateConsumer);
-  if (mqttStateConsumerCount < mqttStateConsumerBufferSize) {
-    stateConsumers[mqttStateConsumerCount] = stateConsumer;
-    mqttStateConsumerCount++;
-  }
+void MQTTDeviceService::setResetStateConsumer(MQTTStateConsumer *resetStateConsumer) {
+    this->resetStateConsumer = resetStateConsumer;
+}
+
+void MQTTDeviceService::addPublisher(MQTTPublisher *mqttPublisher) {
+    if (mqttPublisherCount < mqttPublisherBufferSize) {
+        publishers[mqttPublisherCount] = mqttPublisher;
+        mqttPublisherCount++;
+    }
+}
+
+void MQTTDeviceService::addStateConsumer(MQTTStateConsumer *stateConsumer) {
+    addPublisher(stateConsumer);
+    if (mqttStateConsumerCount < mqttStateConsumerBufferSize) {
+        stateConsumers[mqttStateConsumerCount] = stateConsumer;
+        mqttStateConsumerCount++;
+    }
 }
 
 void MQTTDeviceService::setupMQTTDevices() {
-  for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
-    publishers[publisherIndex]->initializePublisher(messageQueueClient);
-    publishers[publisherIndex]->configureInTargetPlatform();
-    delay(500);
-  }
-  for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
-    stateConsumers[consumerIndex]->setupSubscriptions();
-    delay(100);
-  }
-  if (resetStateConsumer) {
-    resetStateConsumer->initializePublisher(messageQueueClient);
-    resetStateConsumer->configureInTargetPlatform();
-    resetStateConsumer->setupSubscriptions();
-  }
+    for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
+        publishers[publisherIndex]->initializePublisher(messageQueueClient);
+        publishers[publisherIndex]->configureInTargetPlatform();
+        delay(500);
+    }
+    for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
+        stateConsumers[consumerIndex]->setupSubscriptions();
+        delay(100);
+    }
+    if (resetStateConsumer) {
+        resetStateConsumer->initializePublisher(messageQueueClient);
+        resetStateConsumer->configureInTargetPlatform();
+        resetStateConsumer->setupSubscriptions();
+    }
 }
 
 void MQTTDeviceService::executeLoop() {
-  if (messageQueueClient->loopClient()) {
-    for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
-      publishers[publisherIndex]->publishToTargetPlatform();
+    if (messageQueueClient->loopClient()) {
+        for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
+            publishers[publisherIndex]->publishToTargetPlatform();
+        }
+        for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
+            stateConsumers[consumerIndex]->executeLoopMethod();
+        }
     }
-    for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
-      stateConsumers[consumerIndex]->executeLoopMethod();
-    }
-  }
 }
 
 void MQTTDeviceService::handleMessage(String topic, String payload) {
-  for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
-    if (stateConsumers[consumerIndex]->consumeMessage(topic, payload)) {
-      break;
+    for (int consumerIndex = 0; consumerIndex < mqttStateConsumerCount; consumerIndex++) {
+        if (stateConsumers[consumerIndex]->consumeMessage(topic, payload)) {
+            break;
+        }
     }
-  }
-  if (resetStateConsumer) {
-    if (resetStateConsumer->consumeMessage(topic, payload)) {
-      logLineToSerial("Resetting device sensor/actor states");
-      for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
-        publishers[publisherIndex]->reset();
-      }
-      resetStateConsumer->reset();
+    if (resetStateConsumer) {
+        if (resetStateConsumer->consumeMessage(topic, payload)) {
+            logLineToSerial("Resetting device sensor/actor states");
+            for (int publisherIndex = 0; publisherIndex < mqttPublisherCount; publisherIndex++) {
+                publishers[publisherIndex]->reset();
+            }
+            resetStateConsumer->reset();
+        }
     }
-  }
 }
 
 void setupWifiConnection(const char* ssid, const char* password) {
@@ -182,7 +195,7 @@ void checkWifiStatus(const char* ssid, const char* password) {
 }
 
 void displayFreeRam() {
-  uint32_t free = system_get_free_heap_size();
-  Serial.print("Free ram: ");
-  Serial.println(free);
+    uint32_t free = system_get_free_heap_size();
+    Serial.print("Free ram: ");
+    Serial.println(free);
 }
