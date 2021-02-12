@@ -24,16 +24,16 @@ struct MQTTDeviceInfo {
 };
 
 class MQTTDeviceClassificationFactory {
- protected:
+protected:
   String deviceUniqueId;
 
- public:
+public:
   MQTTDeviceClassificationFactory(String deviceUniqueId);
   virtual MQTTDeviceClassification create() = 0;
 };
 
 class MQTTDevice : public SerialLogger {
- private:
+private:
   MQTTDeviceInfo deviceInfo;
   MQTTDeviceClassification deviceClassification;
   String autoDiscoveryMQTTConfigureTopic;
@@ -44,11 +44,11 @@ class MQTTDevice : public SerialLogger {
   int publishAutoDiscoveryInfo(DynamicJsonDocument jsonDocument);
   bool deregisterDeviceInOrigin();
 
- protected:
+protected:
   String sensorHomeAssistantPath;
   String deviceEntityName;
   String stateTopic;
-  MessageQueueClient* mqttClient;
+  MessageQueueClient *mqttClient;
 
   int publishState(String stateTopicPayload);
   int publishTo(String stateTopic, String stateTopicPayload, bool retain = false);
@@ -57,21 +57,21 @@ class MQTTDevice : public SerialLogger {
   virtual DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
   DynamicJsonDocument createJsonDocument(int capacity);
 
- public:
-  MQTTDevice(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo);
+public:
+  MQTTDevice(MQTTDeviceClassificationFactory *deviceClassFactory, MQTTDeviceInfo deviceInfo);
   void configureViaBroker();
   virtual void reset() = 0;
 };
 
 class MQTTSensor : public MQTTDevice, public MQTTPublisher {
- protected:
+protected:
   bool areEqual(float value1, float value2, float maxDifference = 0.001);
   void publishFloatValue(float value);
   void publishBinaryMessage(bool on);
 
- public:
-  MQTTSensor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo);
-  void initializePublisher(MessageQueueClient* mqttClient);
+public:
+  MQTTSensor(MQTTDeviceClassificationFactory *deviceClassFactory, MQTTDeviceInfo deviceInfo);
+  void initializePublisher(MessageQueueClient *mqttClient);
   void configureInTargetPlatform();
   void publishToTargetPlatform();
   virtual void setupSensor();
@@ -79,7 +79,7 @@ class MQTTSensor : public MQTTDevice, public MQTTPublisher {
 };
 
 class MQTTActor : public MQTTDevice, public MQTTStateConsumer {
- protected:
+protected:
   bool actorStatusChanged = false;
   String commandTopic;
   String brightnessCommandTopic;
@@ -87,9 +87,9 @@ class MQTTActor : public MQTTDevice, public MQTTStateConsumer {
   virtual void reportStatusInformation() = 0;
   void reportStatus();
 
- public:
-  MQTTActor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo);
-  void initializePublisher(MessageQueueClient* mqttClient);
+public:
+  MQTTActor(MQTTDeviceClassificationFactory *deviceClassFactory, MQTTDeviceInfo deviceInfo);
+  void initializePublisher(MessageQueueClient *mqttClient);
   void configureInTargetPlatform();
   void publishToTargetPlatform();
   void reset();

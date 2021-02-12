@@ -6,27 +6,28 @@
 #include "MQTTDevice.h"
 
 class MQTTSwitchDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
- private:
+private:
   String deviceName;
   String deviceType;
 
- public:
+public:
   MQTTSwitchDeviceClassificationFactory(String deviceUniqueId, String deviceType, String deviceName);
   MQTTDeviceClassification create();
 };
 
 class MQTTSwitch : public MQTTActor {
- private:
+private:
   String SWITCH_PAYLOAD_ON = "ON";
   String SWITCH_PAYLOAD_OFF = "OFF";
   int switchPin;
 
- protected:
+protected:
   bool switchOn = false;
   void reportStatusInformation();
 
- public:
-  MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName = "relais_switch", String deviceType = "light");
+public:
+  MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName = "relais_switch",
+             String deviceType = "light");
 
   DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
   virtual void setupActor();
@@ -36,7 +37,7 @@ class MQTTSwitch : public MQTTActor {
 };
 
 class MQTTDeviceResetSwitch : public MQTTSwitch {
- public:
+public:
   MQTTDeviceResetSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, String deviceName = "reset_switch");
   void executeLoopMethod();
   void setupActor();
@@ -51,13 +52,13 @@ struct RGBPins {
 struct MQTTRgbLightConfiguration {};
 
 class MQTTRgbLightDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
- public:
+public:
   MQTTRgbLightDeviceClassificationFactory(String deviceUniqueId);
   MQTTDeviceClassification create();
 };
 
 class MQTTRgbLight : public MQTTActor {
- private:
+private:
   RGBPins pins;
   volatile bool stripOn = false;
   double currentBrightness = 0.0;
@@ -75,7 +76,7 @@ class MQTTRgbLight : public MQTTActor {
   void processColorCommandPayload(String payload);
   bool processIncomingMessage(String topic, String payload);
 
- public:
+public:
   MQTTRgbLight(MQTTDeviceInfo deviceInfo, String uniqueId, RGBPins pins);
 
   DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
@@ -103,13 +104,13 @@ struct MQTTI2CRgbLightConfiguration {
 };
 
 class MQTTI2CRgbLightDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
- public:
+public:
   MQTTI2CRgbLightDeviceClassificationFactory(String deviceUniqueId);
   MQTTDeviceClassification create();
 };
 
 class MQTTI2CRgbLight : public MQTTActor {
- private:
+private:
   bool stripOn = false;
   int currentBrightness = 0;
   int redColorPart = 0;
@@ -132,8 +133,9 @@ class MQTTI2CRgbLight : public MQTTActor {
   void processColorCommandPayload(String payload);
   bool processIncomingMessage(String topic, String payload);
 
- public:
-  MQTTI2CRgbLight(MQTTDeviceInfo deviceInfo, String uniqueId, MQTTI2CRgbLightConfiguration lightConfiguration);
+public:
+  MQTTI2CRgbLight(MQTTDeviceInfo deviceInfo, String uniqueId,
+                  MQTTI2CRgbLightConfiguration lightConfiguration);
   DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
   void setupActor();
   void setupSubscriptions();

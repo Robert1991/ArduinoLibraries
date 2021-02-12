@@ -1,21 +1,17 @@
 #include <ESPFileUtils.h>
 
-boolean mountFileSystem()
-{
-  if (!LittleFS.begin())
-  {
+boolean mountFileSystem() {
+  if (!LittleFS.begin()) {
     Serial.println("LittleFS mount failed");
     return false;
   }
   return true;
 }
 
-boolean fileExists(String path)
-{
+boolean fileExists(String path) {
   Serial.println("Checking if file exists: " + path);
   File file = LittleFS.open(path, "r");
-  if (file)
-  {
+  if (file) {
     Serial.println("file exists: " + path);
     file.close();
     return true;
@@ -24,14 +20,12 @@ boolean fileExists(String path)
   return false;
 }
 
-String readFile(const String path)
-{
+String readFile(const String path) {
   Serial.println("Reading file: " + path);
 
   String fileContent = "";
   File file = LittleFS.open(path, "r");
-  if (!file)
-  {
+  if (!file) {
     Serial.println("Failed to open file for reading");
     return fileContent;
   }
@@ -44,33 +38,26 @@ String readFile(const String path)
   return fileContent;
 }
 
-void writeFile(String path, String message)
-{
+void writeFile(String path, String message) {
   Serial.println("Writing file: " + path);
 
   File file = LittleFS.open(path, "w");
-  if (!file)
-  {
+  if (!file) {
     Serial.println("Failed to open file for writing");
     return;
   }
-  if (file.print(message))
-  {
+  if (file.print(message)) {
     Serial.println("File written");
-  }
-  else
-  {
+  } else {
     Serial.println("Write failed");
   }
   file.close();
 }
 
-boolean deleteFile(const String path)
-{
+boolean deleteFile(const String path) {
   Serial.println("Deleting file: " + path);
 
-  if (LittleFS.remove(path))
-  {
+  if (LittleFS.remove(path)) {
     Serial.println("File deleted");
     return true;
   }

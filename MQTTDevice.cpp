@@ -1,16 +1,19 @@
 #include "MQTTDevice.h"
 
 // Device
-MQTTDeviceClassificationFactory::MQTTDeviceClassificationFactory(String deviceUniqueId) { this->deviceUniqueId = deviceUniqueId; }
+MQTTDeviceClassificationFactory::MQTTDeviceClassificationFactory(String deviceUniqueId) {
+  this->deviceUniqueId = deviceUniqueId;
+}
 
-MQTTDevice::MQTTDevice(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo) {
+MQTTDevice::MQTTDevice(MQTTDeviceClassificationFactory *deviceClassFactory, MQTTDeviceInfo deviceInfo) {
   MQTTDeviceClassification deviceClass = deviceClassFactory->create();
   assignDeviceInfos(deviceClass, deviceInfo);
 }
 
 void MQTTDevice::assignDeviceInfos(MQTTDeviceClassification deviceClass, MQTTDeviceInfo deviceInfo) {
   this->deviceEntityName = deviceInfo.deviceName + "_" + deviceClass.sensorType;
-  this->sensorHomeAssistantPath = deviceInfo.autoDiscoveryPrefix + "/" + deviceClass.deviceType + "/" + deviceEntityName;
+  this->sensorHomeAssistantPath =
+      deviceInfo.autoDiscoveryPrefix + "/" + deviceClass.deviceType + "/" + deviceEntityName;
   this->stateTopic = sensorHomeAssistantPath + "/state";
   this->autoDiscoveryMQTTConfigureTopic = sensorHomeAssistantPath + "/config";
   this->deviceClassification = deviceClass;
@@ -21,7 +24,9 @@ int MQTTDevice::publishAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDo
   return publishJsonDocument(autoDiscoveryMQTTConfigureTopic, autoConfigureJsonDocument, true);
 }
 
-int MQTTDevice::publishTo(String topic, String payload, bool retain) { return mqttClient->publishMessage(topic, payload, retain); }
+int MQTTDevice::publishTo(String topic, String payload, bool retain) {
+  return mqttClient->publishMessage(topic, payload, retain);
+}
 
 int MQTTDevice::publishState(String stateTopicPayload) { return publishTo(stateTopic, stateTopicPayload); }
 
@@ -78,12 +83,15 @@ bool MQTTDevice::deregisterDeviceInOrigin() {
   return mqttClient->publishMessage(autoDiscoveryMQTTConfigureTopic, emptyConfigureMessage, true);
 }
 
-DynamicJsonDocument MQTTDevice::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) { return autoConfigureJsonDocument; }
+DynamicJsonDocument MQTTDevice::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+  return autoConfigureJsonDocument;
+}
 
 // Sensor
-MQTTSensor::MQTTSensor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo) : MQTTDevice(deviceClassFactory, deviceInfo) {}
+MQTTSensor::MQTTSensor(MQTTDeviceClassificationFactory *deviceClassFactory, MQTTDeviceInfo deviceInfo)
+    : MQTTDevice(deviceClassFactory, deviceInfo) {}
 
-void MQTTSensor::initializePublisher(MessageQueueClient* mqttClient) {
+void MQTTSensor::initializePublisher(MessageQueueClient *mqttClient) {
   this->mqttClient = mqttClient;
   setupSensor();
 }
@@ -118,11 +126,12 @@ bool MQTTSensor::areEqual(float value1, float value2, float maxDifference) {
 }
 
 // Actor
-MQTTActor::MQTTActor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo) : MQTTDevice(deviceClassFactory, deviceInfo) {}
+MQTTActor::MQTTActor(MQTTDeviceClassificationFactory *deviceClassFactory, MQTTDeviceInfo deviceInfo)
+    : MQTTDevice(deviceClassFactory, deviceInfo) {}
 
 void MQTTActor::configureInTargetPlatform() { configureViaBroker(); }
 
-void MQTTActor::initializePublisher(MessageQueueClient* mqttClient) {
+void MQTTActor::initializePublisher(MessageQueueClient *mqttClient) {
   this->mqttClient = mqttClient;
   setupActor();
 }

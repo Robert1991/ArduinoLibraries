@@ -1,6 +1,8 @@
 #include "MQTTActors.h"
 
-MQTTSwitchDeviceClassificationFactory::MQTTSwitchDeviceClassificationFactory(String deviceUniqueId, String deviceName, String deviceType)
+MQTTSwitchDeviceClassificationFactory::MQTTSwitchDeviceClassificationFactory(String deviceUniqueId,
+                                                                             String deviceName,
+                                                                             String deviceType)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {
   this->deviceName = deviceName;
   this->deviceType = deviceType;
@@ -11,7 +13,8 @@ MQTTDeviceClassification MQTTSwitchDeviceClassificationFactory::create() {
   return deviceClass;
 }
 
-MQTTSwitch::MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName, String deviceType)
+MQTTSwitch::MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName,
+                       String deviceType)
     : MQTTActor(new MQTTSwitchDeviceClassificationFactory(uniqueId, deviceName, deviceType), deviceInfo) {
   this->commandTopic = deviceEntityName + "/" + "switch";
   this->switchPin = switchPin;
@@ -74,7 +77,8 @@ void MQTTDeviceResetSwitch::executeLoopMethod() {
   }
 }
 
-MQTTRgbLightDeviceClassificationFactory::MQTTRgbLightDeviceClassificationFactory(String uniqueId) : MQTTDeviceClassificationFactory(uniqueId) {}
+MQTTRgbLightDeviceClassificationFactory::MQTTRgbLightDeviceClassificationFactory(String uniqueId)
+    : MQTTDeviceClassificationFactory(uniqueId) {}
 
 MQTTDeviceClassification MQTTRgbLightDeviceClassificationFactory::create() {
   MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", "rgb", false};
@@ -151,8 +155,8 @@ void MQTTRgbLight::processBrightnessPayload(String payload) {
 void MQTTRgbLight::processColorCommandPayload(String payload) {
   char buffer[32];
   payload.toCharArray(buffer, sizeof(buffer));
-  char* p = buffer;
-  char* str;
+  char *p = buffer;
+  char *str;
   int iteration = 0;
   while ((str = strtok_r(p, ",", &p)) != NULL) {
     if (iteration == 0) {
@@ -201,14 +205,16 @@ bool MQTTRgbLight::consumeMessage(String topic, String payload) {
   return actorStatusChanged;
 }
 
-MQTTI2CRgbLightDeviceClassificationFactory::MQTTI2CRgbLightDeviceClassificationFactory(String uniqueId) : MQTTDeviceClassificationFactory(uniqueId) {}
+MQTTI2CRgbLightDeviceClassificationFactory::MQTTI2CRgbLightDeviceClassificationFactory(String uniqueId)
+    : MQTTDeviceClassificationFactory(uniqueId) {}
 
 MQTTDeviceClassification MQTTI2CRgbLightDeviceClassificationFactory::create() {
   MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "light", "i2c_rgb", false};
   return deviceClass;
 }
 
-MQTTI2CRgbLight::MQTTI2CRgbLight(MQTTDeviceInfo deviceInfo, String uniqueId, MQTTI2CRgbLightConfiguration lightConfiguration)
+MQTTI2CRgbLight::MQTTI2CRgbLight(MQTTDeviceInfo deviceInfo, String uniqueId,
+                                 MQTTI2CRgbLightConfiguration lightConfiguration)
     : MQTTActor(new MQTTI2CRgbLightDeviceClassificationFactory(uniqueId), deviceInfo) {
   this->lightConfiguration = lightConfiguration;
   commandTopic = deviceEntityName + "/switch";
@@ -230,7 +236,9 @@ DynamicJsonDocument MQTTI2CRgbLight::extendAutoDiscoveryInfo(DynamicJsonDocument
   return autoConfigureJsonDocument;
 }
 
-void MQTTI2CRgbLight::setupActor() { establishI2CConnectionTo(lightConfiguration.wirePins.sdaPin, lightConfiguration.wirePins.sclPin, true); }
+void MQTTI2CRgbLight::setupActor() {
+  establishI2CConnectionTo(lightConfiguration.wirePins.sdaPin, lightConfiguration.wirePins.sclPin, true);
+}
 
 void MQTTI2CRgbLight::setupSubscriptions() {
   subscribeTopic(commandTopic);
@@ -241,8 +249,8 @@ void MQTTI2CRgbLight::setupSubscriptions() {
 void MQTTI2CRgbLight::processColorCommandPayload(String payload) {
   char buffer[32];
   payload.toCharArray(buffer, sizeof(buffer));
-  char* p = buffer;
-  char* str;
+  char *p = buffer;
+  char *str;
   int iteration = 0;
   while ((str = strtok_r(p, ",", &p)) != NULL) {
     if (iteration == 0) {
@@ -337,7 +345,8 @@ void MQTTI2CRgbLight::refreshI2CConnection() {
   }
 }
 
-void MQTTI2CRgbLight::sendRGBValuesToSecondary(byte redValue, byte greenValue, byte blueValue, int delayTime) {
+void MQTTI2CRgbLight::sendRGBValuesToSecondary(byte redValue, byte greenValue, byte blueValue,
+                                               int delayTime) {
   refreshI2CConnection();
   Serial.print("Sending I2C command {");
   Serial.print(lightConfiguration.i2cConnectionCommands.setColorCommand);
@@ -360,7 +369,8 @@ void MQTTI2CRgbLight::sendRGBValuesToSecondary(byte redValue, byte greenValue, b
 void MQTTI2CRgbLight::applyChoosenColorToLeds() {
   if (stripOn) {
     if (onOffStatusChanged) {
-      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress, lightConfiguration.i2cConnectionCommands.setOnOffCommand, 1);
+      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress,
+                                  lightConfiguration.i2cConnectionCommands.setOnOffCommand, 1);
       onOffStatusChanged = false;
     }
     if (colorChanged) {
@@ -368,13 +378,15 @@ void MQTTI2CRgbLight::applyChoosenColorToLeds() {
       colorChanged = false;
     }
     if (brightnessChanged) {
-      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress, lightConfiguration.i2cConnectionCommands.setBrightnessCommand,
+      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress,
+                                  lightConfiguration.i2cConnectionCommands.setBrightnessCommand,
                                   currentBrightness);
       brightnessChanged = false;
     }
   } else {
     if (onOffStatusChanged) {
-      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress, lightConfiguration.i2cConnectionCommands.setOnOffCommand, 0);
+      sendI2CCommandWithParameter(lightConfiguration.wirePins.i2cSecondaryAddress,
+                                  lightConfiguration.i2cConnectionCommands.setOnOffCommand, 0);
       onOffStatusChanged = false;
     }
   }

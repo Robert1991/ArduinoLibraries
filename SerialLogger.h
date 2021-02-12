@@ -7,7 +7,7 @@
 class SerialLogger {
   bool verboseLoggingIsEnabled = false;
 
- protected:
+protected:
   void logLineToSerial(double value) {
     if (verboseLoggingIsEnabled) {
       Serial.println(value);
@@ -44,7 +44,7 @@ class SerialLogger {
     }
   };
 
- public:
+public:
   void setVerbose(bool enableVerboseLogging) { this->verboseLoggingIsEnabled = enableVerboseLogging; }
 };
 
