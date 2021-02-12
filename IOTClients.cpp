@@ -1,95 +1,123 @@
 #include <IOTClients.h>
 
-MessageQueueClient::MessageQueueClient(const char* clientName, const char* userName, const char* password, int subscriptionTopicBufferSize) {
-  this->clientName = clientName;
-  this->userName = userName;
-  this->password = password;
-  this->subscriptionTopicBufferSize = subscriptionTopicBufferSize;
+MessageQueueClient::MessageQueueClient(String clientName, String userName, int subscriptionTopicBufferSize) {
+    this->clientName = clientName;
+    this->userName = userName;
+    this->subscriptionTopicBufferSize = subscriptionTopicBufferSize;
 }
 
-void MessageQueueClient::setupClient(MQTTClient* mqttClient) {
-  this->mqttClient = mqttClient;
-  this->connectToBroker();
+MessageQueueClient::MessageQueueClient(String clientName, int subscriptionTopicBufferSize) {
+    this->clientName = clientName;
+    this->subscriptionTopicBufferSize = subscriptionTopicBufferSize;
+}
+
+MessageQueueClient::MessageQueueClient(String clientName, String userName, String password,
+                                       int subscriptionTopicBufferSize) {
+    this->clientName = clientName;
+    this->userName = userName;
+    this->password = password;
+    this->subscriptionTopicBufferSize = subscriptionTopicBufferSize;
+}
+
+boolean MessageQueueClient::setupClient(WiFiClient &wifiClient,
+                                        MQTTClientCallbackSimple messageReceivedCallback, String broker,
+                                        int port, int bufferSize) {
+    this->mqttClient = new MQTTClient(bufferSize);
+    const char *brokerChars = convertStringToCharArray(broker);
+    mqttClient->begin(brokerChars, port, wifiClient);
+    mqttClient->onMessage(messageReceivedCallback);
+    return connectToBroker();
 }
 
 int MessageQueueClient::publishMessage(String topic, String payload, bool retain) {
-  reconnectIfNecassary();
-  logToSerial("Publishing: topic: ");
-  logToSerial(topic);
-  logToSerial(" payload: ");
-  logLineToSerial(payload);
-  return mqttClient->publish(topic, payload, retain, 1);
+    reconnectIfNecassary();
+    logToSerial("Publishing: topic: ");
+    logToSerial(topic);
+    logToSerial(" payload: ");
+    logLineToSerial(payload);
+    return mqttClient->publish(topic, payload, retain, 1);
 }
 
 void MessageQueueClient::subscribeTopic(String topic) {
-  reconnectIfNecassary();
-  logToSerial("Subscribing ");
-  logLineToSerial(topic);
-  if (subscribeTopicCount < subscriptionTopicBufferSize) {
-    subscribeTopicArray[subscribeTopicCount] = topic;
-    subscribeTopicCount++;
-  }
-  bool subscriptionSuccessful = mqttClient->subscribe(topic);
-  logToSerial("Subscription return status: ");
-  logLineToSerial(subscriptionSuccessful);
+    reconnectIfNecassary();
+    logToSerial("Subscribing ");
+    logLineToSerial(topic);
+    if (subscribeTopicCount < subscriptionTopicBufferSize) {
+        subscribeTopicArray[subscribeTopicCount] = topic;
+        subscribeTopicCount++;
+    }
+    bool subscriptionSuccessful = mqttClient->subscribe(topic);
+    logToSerial("Subscription return status: ");
+    logLineToSerial(subscriptionSuccessful);
 }
 
 void MessageQueueClient::subscribeTopics(String subscribeTopics[], int countOfTopics) {
-  for (int i = 0; i < countOfTopics; i++) {
-    subscribeTopicArray[subscribeTopicCount] = subscribeTopics[i];
-    subscribeTopicCount++;
-  }
+    for (int i = 0; i < countOfTopics; i++) {
+        subscribeTopicArray[subscribeTopicCount] = subscribeTopics[i];
+        subscribeTopicCount++;
+    }
 }
 
 bool MessageQueueClient::loopClient() {
-  if (reconnectIfNecassary()) {
-    return mqttClient->loop();
-  }
-  return false;
+    if (reconnectIfNecassary()) {
+        return mqttClient->loop();
+    }
+    return false;
 }
 
 bool MessageQueueClient::reconnectIfNecassary() {
-  if (!mqttClient->connected()) {
-    return this->connectToBroker();
-  }
-  return true;
+    if (!mqttClient->connected()) {
+        return this->connectToBroker();
+    }
+    return true;
 }
 
 bool MessageQueueClient::connectToBroker(int connectTimeout, int reconnectTries) {
-  logLineToSerial("connecting mqtt client...");
-  int currentTry = 0;
-  while (!mqttClient->connect(clientName, userName, password) && (currentTry < reconnectTries)) {
-    logLineToSerial("Connection attemp failed. Reconnecting...");
-    currentTry++;
-    delay(connectTimeout);
-  }
-  if (currentTry >= reconnectTries) {
-    return false;
-  } else {
-    logToSerial("Subscribing again to topic count: ");
-    logLineToSerial(subscribeTopicCount);
-
-    for (int i = 0; i < subscribeTopicCount; i++) {
-      logToSerial("Subscribing: ");
-      logLineToSerial(subscribeTopicArray[i]);
-      boolean subscriptionSuccessful = mqttClient->subscribe(subscribeTopicArray[i]);
-      logToSerial("Subscription return status: ");
-      logLineToSerial(subscriptionSuccessful);
+    logLineToSerial("connecting mqtt client...");
+    int currentTry = 0;
+    while (!connectMqttToBroker() && (currentTry < reconnectTries)) {
+        logLineToSerial("Connection attemp failed. Reconnecting...");
+        currentTry++;
+        delay(connectTimeout);
     }
-    loopClient();
-    return true;
-  }
+    if (currentTry >= reconnectTries) {
+        return false;
+    } else {
+        logToSerial("Subscribing again to topic count: ");
+        logLineToSerial(subscribeTopicCount);
+
+        for (int i = 0; i < subscribeTopicCount; i++) {
+            logToSerial("Subscribing: ");
+            logLineToSerial(subscribeTopicArray[i]);
+            boolean subscriptionSuccessful = mqttClient->subscribe(subscribeTopicArray[i]);
+            logToSerial("Subscription return status: ");
+            logLineToSerial(subscriptionSuccessful);
+        }
+        loopClient();
+        return true;
+    }
 }
 
-MQTTDeviceService::MQTTDeviceService(MessageQueueClient* messageQueueClient, int mqttPublisherBufferSize, int mqttStateConsumerBufferSize) {
-  this->messageQueueClient = messageQueueClient;
-  this->mqttPublisherBufferSize = mqttPublisherBufferSize;
-  this->mqttStateConsumerBufferSize = mqttStateConsumerBufferSize;
-  this->publishers = new MQTTPublisher*[mqttPublisherBufferSize];
-  this->stateConsumers = new MQTTStateConsumer*[mqttStateConsumerBufferSize];
+bool MessageQueueClient::connectMqttToBroker() {
+    const char *clientNameChars = convertStringToCharArray(clientName);
+
+    if (password && userName) {
+        const char *passwordChars = convertStringToCharArray(password);
+        const char *userNameChars = convertStringToCharArray(userName);
+        return mqttClient->connect(clientNameChars, userNameChars, passwordChars);
+    } else if (userName) {
+        const char *userNameChars = convertStringToCharArray(userName);
+        return mqttClient->connect(clientNameChars, userNameChars);
+    } else {
+        return mqttClient->connect(clientNameChars);
+    }
 }
 
-void MQTTDeviceService::setResetStateConsumer(MQTTStateConsumer* resetStateConsumer) { this->resetStateConsumer = resetStateConsumer; }
+char *MessageQueueClient::convertStringToCharArray(String toBeConverted, int bufferSize) {
+    char *charArrayBuffer = (char *)malloc(bufferSize * sizeof(char));
+    toBeConverted.toCharArray(charArrayBuffer, bufferSize);
+    return charArrayBuffer;
+}
 
 MQTTDeviceService::MQTTDeviceService(MessageQueueClient *messageQueueClient, int mqttPublisherBufferSize,
                                      int mqttStateConsumerBufferSize) {
