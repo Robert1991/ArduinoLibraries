@@ -100,7 +100,59 @@ DynamicJsonDocument MQTTPhotoLightSensor::extendAutoDiscoveryInfo(DynamicJsonDoc
 
 void MQTTPhotoLightSensor::reset() { lastVoltageValue = -1.0; }
 
-MQTTMotionSensorDeviceClassificationFactory::MQTTMotionSensorDeviceClassificationFactory(String deviceUniqueId)
+MQTTBatterySensorDeviceClassificationFactory::MQTTBatterySensorDeviceClassificationFactory(
+    String deviceUniqueId)
+    : MQTTDeviceClassificationFactory(deviceUniqueId) {}
+
+MQTTDeviceClassification MQTTBatterySensorDeviceClassificationFactory::create() {
+    MQTTDeviceClassification deviceClass = {deviceUniqueId, "battery", "sensor", "battery_percentage", true};
+    return deviceClass;
+}
+
+MQTTBatterySensor::MQTTBatterySensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin,
+                                     float batteryNamedVoltage, float batteryMinimumVoltage,
+                                     float batteryMaximumVoltage)
+    : MQTTSensor(new MQTTBatterySensorDeviceClassificationFactory(sensorUniqueId), deviceInfo) {
+    this->analogPin = analogPin;
+    this->batteryMinimumVoltage = batteryMinimumVoltage;
+    this->batteryMaximumVoltage = batteryMaximumVoltage;
+    this->batteryNamedVoltage = batteryNamedVoltage;
+
+    this->attributesTopic = sensorHomeAssistantPath + "/attributes";
+}
+
+DynamicJsonDocument
+MQTTBatterySensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+    autoConfigureJsonDocument["json_attr_t"] = attributesTopic;
+    autoConfigureJsonDocument["unit_of_meas"] = "%";
+    return autoConfigureJsonDocument;
+}
+
+void MQTTBatterySensor::publishMeasurement() {
+    int sensorValue = analogRead(analogPin);
+
+    float currentVoltage = sensorValue * (batteryNamedVoltage / 1023.00);
+    float currentPercentage =
+        100 * (currentVoltage - batteryMinimumVoltage) / (batteryMaximumVoltage - batteryMinimumVoltage);
+    if (!areEqual(lastMeasuredPercentage, currentPercentage, 0.5)) {
+        lastMeasuredPercentage = currentPercentage;
+        publishFloatValue(currentPercentage);
+        publishAbsoluteVoltage(currentVoltage);
+    }
+}
+
+void MQTTBatterySensor::publishAbsoluteVoltage(float currentVoltage) {
+    DynamicJsonDocument stateAttributes = createJsonDocument(256);
+    stateAttributes["current_voltage"] = currentVoltage;
+    stateAttributes["battery_full_voltage"] = batteryNamedVoltage;
+    stateAttributes["battery_empty_voltage"] = batteryMinimumVoltage;
+    publishJsonDocument(attributesTopic, stateAttributes);
+}
+
+void MQTTBatterySensor::reset() { this->lastMeasuredPercentage = 0.0; }
+
+MQTTMotionSensorDeviceClassificationFactory::MQTTMotionSensorDeviceClassificationFactory(
+    String deviceUniqueId)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTMotionSensorDeviceClassificationFactory::create() {

@@ -85,6 +85,33 @@ class MQTTMotionSensor : public MQTTSensor {
   void reset();
 };
 
+class MQTTBatterySensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+ public:
+  MQTTBatterySensorDeviceClassificationFactory(String deviceUniqueId);
+  MQTTDeviceClassification create();
+};
+
+class MQTTBatterySensor : public MQTTSensor {
+ private:
+    String attributesTopic;
+    float batteryMinimumVoltage = 0.0;
+    float batteryMaximumVoltage = 0.0;
+    float batteryNamedVoltage = 0.0;
+    float lastMeasuredPercentage = 0.0;
+   
+    int analogPin = 0;
+
+    DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+    void publishAbsoluteVoltage(float currentVoltage);
+
+ public:
+    MQTTBatterySensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int analogPin, float batteryNamedVoltage, float batteryMinimumVoltage,
+                    float batteryMaximumVoltage);
+
+    void publishMeasurement();
+    void reset();
+};
+
 class MQTTDHTSensor : public MQTTSensor {
  private:
   int currentIteration = 0;
