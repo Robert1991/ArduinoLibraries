@@ -33,9 +33,9 @@ void MQTTDevicePing::publishPing() {
 }
 
 DynamicJsonDocument MQTTDevicePing::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
-  int pingTimeoutInSeconds = pingTimeout / 1000;
-  autoConfigureJsonDocument["off_dly"] = pingTimeoutInSeconds * 2 + 1;
-  return autoConfigureJsonDocument;
+    int pingTimeoutInSeconds = pingTimeout / 1000;
+    autoConfigureJsonDocument["off_dly"] = pingTimeoutInSeconds * 2 + 1;
+    return autoConfigureJsonDocument;
 }
 
 void MQTTDevicePing::reset() { startTime = millis() + pingTimeout + 1; }
@@ -44,35 +44,35 @@ MQTTDoorSensorDeviceClassificationFactory::MQTTDoorSensorDeviceClassificationFac
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTDoorSensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "door", "binary_sensor", "door_open", true};
-  return deviceClass;
+    MQTTDeviceClassification deviceClass = {deviceUniqueId, "door", "binary_sensor", "door_open", true};
+    return deviceClass;
 }
 
 MQTTDoorSensor::MQTTDoorSensor(MQTTDeviceInfo deviceInfo, String uniqueId, int doorSensorPin)
     : MQTTSensor(new MQTTDoorSensorDeviceClassificationFactory(uniqueId), deviceInfo) {
-  this->doorSensorPin = doorSensorPin;
+    this->doorSensorPin = doorSensorPin;
 }
 
 void MQTTDoorSensor::setupSensor() { pinMode(doorSensorPin, INPUT_PULLUP); }
 
 void MQTTDoorSensor::publishMeasurement() {
-  int doorState = digitalRead(doorSensorPin);
+    int doorState = digitalRead(doorSensorPin);
 
-  if (doorState == HIGH && !doorIsOpen) {
-    doorIsOpen = true;
-    publishBinaryMessage(true);
-  } else if (doorState == LOW && doorIsOpen) {
-    doorIsOpen = false;
-    publishBinaryMessage(false);
-  }
+    if (doorState == HIGH && !doorIsOpen) {
+        doorIsOpen = true;
+        publishBinaryMessage(true);
+    } else if (doorState == LOW && doorIsOpen) {
+        doorIsOpen = false;
+        publishBinaryMessage(false);
+    }
 }
 
 void MQTTDoorSensor::reset() {
-  if (doorIsOpen) {
-    doorIsOpen = false;
-  } else {
-    doorIsOpen = true;
-  }
+    if (doorIsOpen) {
+        doorIsOpen = false;
+    } else {
+        doorIsOpen = true;
+    }
 }
 
 MQTTPhotoLightSensorDeviceClassificationFactory::MQTTPhotoLightSensorDeviceClassificationFactory(
@@ -167,138 +167,148 @@ MQTTMotionSensorDeviceClassificationFactory::MQTTMotionSensorDeviceClassificatio
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTMotionSensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "motion", "binary_sensor", "motion_detected", true};
-  return deviceClass;
+    MQTTDeviceClassification deviceClass = {deviceUniqueId, "motion", "binary_sensor", "motion_detected",
+                                            true};
+    return deviceClass;
 }
 
-MQTTMotionSensor::MQTTMotionSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int motionSensorPin, int motionDetectionIterations,
-                                   int motionDetectionTimeout, int motionDetectedThreshold)
+MQTTMotionSensor::MQTTMotionSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, int motionSensorPin,
+                                   int motionDetectionIterations, int motionDetectionTimeout,
+                                   int motionDetectedThreshold)
     : MQTTSensor(new MQTTMotionSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo) {
-  this->motionSensorPin = motionSensorPin;
-  this->motionDetectionIterations = motionDetectionIterations;
-  this->motionDetectionTimeout = motionDetectionTimeout;
-  this->motionDetectedThreshold = motionDetectedThreshold;
+    this->motionSensorPin = motionSensorPin;
+    this->motionDetectionIterations = motionDetectionIterations;
+    this->motionDetectionTimeout = motionDetectionTimeout;
+    this->motionDetectedThreshold = motionDetectedThreshold;
 }
 
 void MQTTMotionSensor::setupSensor() { pinMode(motionSensorPin, INPUT); }
 
 void MQTTMotionSensor::publishMeasurement() {
-  int motionsDetected = 0;
-  for (int detection = 0; detection < motionDetectionIterations; detection++) {
-    int state = digitalRead(motionSensorPin);
-    if (state == HIGH) {
-      motionsDetected++;
+    int motionsDetected = 0;
+    for (int detection = 0; detection < motionDetectionIterations; detection++) {
+        int state = digitalRead(motionSensorPin);
+        if (state == HIGH) {
+            motionsDetected++;
+        }
+        if (motionsDetected > motionDetectedThreshold) {
+            break;
+        }
+        delay(motionDetectionTimeout);
     }
-    if (motionsDetected > motionDetectedThreshold) {
-      break;
-    }
-    delay(motionDetectionTimeout);
-  }
 
-  bool motionDetected = false;
-  if (motionsDetected > motionDetectedThreshold) {
-    motionDetected = true;
-  }
-  if (lastMotionSensorState != motionDetected) {
-    publishBinaryMessage(motionDetected);
-    logLineToSerial("Motion detected");
-    lastMotionSensorState = motionDetected;
-  }
+    bool motionDetected = false;
+    if (motionsDetected > motionDetectedThreshold) {
+        motionDetected = true;
+    }
+    if (lastMotionSensorState != motionDetected) {
+        publishBinaryMessage(motionDetected);
+        logLineToSerial("Motion detected");
+        lastMotionSensorState = motionDetected;
+    }
 }
 
 void MQTTMotionSensor::reset() { lastMotionSensorState = false; }
 
-MQTTDHTSensor::MQTTDHTSensor(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo, DHT* dhtSensor,
-                             int resetValuesIterations)
+MQTTDHTSensor::MQTTDHTSensor(MQTTDeviceClassificationFactory *deviceClassFactory, MQTTDeviceInfo deviceInfo,
+                             DHT *dhtSensor, int resetValuesIterations)
     : MQTTSensor(deviceClassFactory, deviceInfo) {
-  this->dhtSensor = dhtSensor;
-  this->resetValuesIterations = resetValuesIterations;
+    this->dhtSensor = dhtSensor;
+    this->resetValuesIterations = resetValuesIterations;
 }
 
 void MQTTDHTSensor::setupSensor() { dhtSensor->begin(); }
 
 bool MQTTDHTSensor::resetIfRequired() {
-  if (currentIteration < resetValuesIterations) {
-    logToSerial("current iteration: ");
-    logLineToSerial(currentIteration);
-    currentIteration++;
-    return false;
-  }
-  logLineToSerial("Resetting stored sensor values");
-  currentIteration = 0;
-  reset();
-  return true;
+    if (currentIteration < resetValuesIterations) {
+        logToSerial("current iteration: ");
+        logLineToSerial(currentIteration);
+        currentIteration++;
+        return false;
+    }
+    logLineToSerial("Resetting stored sensor values");
+    currentIteration = 0;
+    reset();
+    return true;
 }
 
-MQTTHumiditySensorDeviceClassificationFactory::MQTTHumiditySensorDeviceClassificationFactory(String deviceUniqueId)
+MQTTHumiditySensorDeviceClassificationFactory::MQTTHumiditySensorDeviceClassificationFactory(
+    String deviceUniqueId)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTHumiditySensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "humidity", "sensor", "humidity", true};
-  return deviceClass;
+    MQTTDeviceClassification deviceClass = {deviceUniqueId, "humidity", "sensor", "humidity", true};
+    return deviceClass;
 }
 
-MQTTHumiditySensor::MQTTHumiditySensor(MQTTDeviceInfo deviceInfo, DHT* dhtSensor, String sensorUniqueId, int resetValuesIterations)
-    : MQTTDHTSensor(new MQTTHumiditySensorDeviceClassificationFactory(sensorUniqueId), deviceInfo, dhtSensor, resetValuesIterations) {
-  this->dhtSensor = dhtSensor;
+MQTTHumiditySensor::MQTTHumiditySensor(MQTTDeviceInfo deviceInfo, DHT *dhtSensor, String sensorUniqueId,
+                                       int resetValuesIterations)
+    : MQTTDHTSensor(new MQTTHumiditySensorDeviceClassificationFactory(sensorUniqueId), deviceInfo, dhtSensor,
+                    resetValuesIterations) {
+    this->dhtSensor = dhtSensor;
 }
 
 void MQTTHumiditySensor::publishMeasurement() {
-  resetIfRequired();
-  publishHumidity();
+    resetIfRequired();
+    publishHumidity();
 }
 
 void MQTTHumiditySensor::publishHumidity() {
-  float currentHumiditySensorValue = dhtSensor->readHumidity();
-  if (!isnan(currentHumiditySensorValue) && currentHumiditySensorValue > 0 && currentHumiditySensorValue < 100) {
-    if (!areEqual(lastMeasuredHumidity, currentHumiditySensorValue)) {
-      logToSerial("Humidity: ");
-      logToSerial(currentHumiditySensorValue);
-      logLineToSerial("%\t");
+    float currentHumiditySensorValue = dhtSensor->readHumidity();
+    if (!isnan(currentHumiditySensorValue) && currentHumiditySensorValue > 0 &&
+        currentHumiditySensorValue < 100) {
+        if (!areEqual(lastMeasuredHumidity, currentHumiditySensorValue)) {
+            logToSerial("Humidity: ");
+            logToSerial(currentHumiditySensorValue);
+            logLineToSerial("%\t");
 
-      publishFloatValue(currentHumiditySensorValue);
-      lastMeasuredHumidity = currentHumiditySensorValue;
+            publishFloatValue(currentHumiditySensorValue);
+            lastMeasuredHumidity = currentHumiditySensorValue;
+        }
     }
-  }
 }
 
 void MQTTHumiditySensor::reset() { lastMeasuredHumidity = 0.0; }
 
-MQTTTemperatureSensorDeviceClassificationFactory::MQTTTemperatureSensorDeviceClassificationFactory(String deviceUniqueId)
+MQTTTemperatureSensorDeviceClassificationFactory::MQTTTemperatureSensorDeviceClassificationFactory(
+    String deviceUniqueId)
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTTemperatureSensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "temperature", "sensor", "temperature", true};
-  return deviceClass;
+    MQTTDeviceClassification deviceClass = {deviceUniqueId, "temperature", "sensor", "temperature", true};
+    return deviceClass;
 }
 
-MQTTTemperatureSensor::MQTTTemperatureSensor(MQTTDeviceInfo deviceInfo, DHT* dhtSensor, String sensorUniqueId, int resetValuesIterations)
-    : MQTTDHTSensor(new MQTTTemperatureSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo, dhtSensor, resetValuesIterations) {
-  this->dhtSensor = dhtSensor;
+MQTTTemperatureSensor::MQTTTemperatureSensor(MQTTDeviceInfo deviceInfo, DHT *dhtSensor, String sensorUniqueId,
+                                             int resetValuesIterations)
+    : MQTTDHTSensor(new MQTTTemperatureSensorDeviceClassificationFactory(sensorUniqueId), deviceInfo,
+                    dhtSensor, resetValuesIterations) {
+    this->dhtSensor = dhtSensor;
 }
 
 void MQTTTemperatureSensor::publishMeasurement() {
-  resetIfRequired();
-  publishTemperature();
+    resetIfRequired();
+    publishTemperature();
 }
 
 void MQTTTemperatureSensor::publishTemperature() {
-  float currentTempSensorValue = dhtSensor->readTemperature();
-  if (!isnan(currentTempSensorValue)) {
-    if (!areEqual(lastMeasuredTemperature, currentTempSensorValue)) {
-      logToSerial("Temperature: ");
-      logToSerial(currentTempSensorValue);
-      logLineToSerial(" degrees celcius");
+    float currentTempSensorValue = dhtSensor->readTemperature();
+    if (!isnan(currentTempSensorValue)) {
+        if (!areEqual(lastMeasuredTemperature, currentTempSensorValue)) {
+            logToSerial("Temperature: ");
+            logToSerial(currentTempSensorValue);
+            logLineToSerial(" degrees celcius");
 
-      publishFloatValue(currentTempSensorValue);
-      lastMeasuredTemperature = currentTempSensorValue;
+            publishFloatValue(currentTempSensorValue);
+            lastMeasuredTemperature = currentTempSensorValue;
+        }
     }
-  }
 }
 
 void MQTTTemperatureSensor::reset() { lastMeasuredTemperature = 0.0; }
 
-DynamicJsonDocument MQTTTemperatureSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
-  autoConfigureJsonDocument["unit_of_measurement"] = "°C";
-  return autoConfigureJsonDocument;
+DynamicJsonDocument
+MQTTTemperatureSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+    autoConfigureJsonDocument["unit_of_meas"] = "°C";
+    return autoConfigureJsonDocument;
 }

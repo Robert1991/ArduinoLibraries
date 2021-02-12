@@ -10,7 +10,7 @@ MQTTDevice::MQTTDevice(MQTTDeviceClassificationFactory* deviceClassFactory, MQTT
 
 void MQTTDevice::assignDeviceInfos(MQTTDeviceClassification deviceClass, MQTTDeviceInfo deviceInfo) {
   this->deviceEntityName = deviceInfo.deviceName + "_" + deviceClass.sensorType;
-  String sensorHomeAssistantPath = deviceInfo.autoDiscoveryPrefix + "/" + deviceClass.deviceType + "/" + deviceEntityName;
+  this->sensorHomeAssistantPath = deviceInfo.autoDiscoveryPrefix + "/" + deviceClass.deviceType + "/" + deviceEntityName;
   this->stateTopic = sensorHomeAssistantPath + "/state";
   this->autoDiscoveryMQTTConfigureTopic = sensorHomeAssistantPath + "/config";
   this->deviceClassification = deviceClass;
@@ -39,8 +39,8 @@ int MQTTDevice::publishJsonDocument(String stateTopic, DynamicJsonDocument jsonD
 void MQTTDevice::subscribeTopic(String subscribeTopic) { return mqttClient->subscribeTopic(subscribeTopic); }
 
 DynamicJsonDocument MQTTDevice::createDeviceInfoJsonObject() {
-  const size_t capacity = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(12) + 540;
-  DynamicJsonDocument autoConfigureJsonDocument(capacity);
+  DynamicJsonDocument autoConfigureJsonDocument = createJsonDocument(540);
+
   autoConfigureJsonDocument["name"] = deviceEntityName;
   if (deviceClassification.deviceClassIsAvailable) {
     autoConfigureJsonDocument["dev_cla"] = deviceClassification.deviceClass;
@@ -52,6 +52,12 @@ DynamicJsonDocument MQTTDevice::createDeviceInfoJsonObject() {
   autoConfigureJsonDocument["dev"]["mdl"] = deviceInfo.deviceType;
   autoConfigureJsonDocument["dev"]["mf"] = deviceInfo.manufacturer;
   return autoConfigureJsonDocument;
+}
+
+DynamicJsonDocument MQTTDevice::createJsonDocument(int capacity) {
+  const size_t document_size = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(12) + capacity;
+  DynamicJsonDocument json_document(document_size);
+  return json_document;
 }
 
 void MQTTDevice::configureViaBroker() {

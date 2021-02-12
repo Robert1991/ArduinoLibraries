@@ -45,6 +45,7 @@ class MQTTDevice : public SerialLogger {
   bool deregisterDeviceInOrigin();
 
  protected:
+  String sensorHomeAssistantPath;
   String deviceEntityName;
   String stateTopic;
   MessageQueueClient* mqttClient;
@@ -54,6 +55,7 @@ class MQTTDevice : public SerialLogger {
   int publishJsonDocument(String stateTopic, DynamicJsonDocument jsonDocument, bool retain = false);
   void subscribeTopic(String subscribeTopic);
   virtual DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+  DynamicJsonDocument createJsonDocument(int capacity);
 
  public:
   MQTTDevice(MQTTDeviceClassificationFactory* deviceClassFactory, MQTTDeviceInfo deviceInfo);
