@@ -5,23 +5,26 @@
 #include "MQTTDevice.h"
 
 class MQTTDevicePingDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
- public:
-  MQTTDevicePingDeviceClassificationFactory(String deviceUniqueId);
-  MQTTDeviceClassification create();
+  public:
+    MQTTDevicePingDeviceClassificationFactory(String deviceUniqueId);
+    MQTTDeviceClassification create();
 };
 
 class MQTTDevicePing : public MQTTSensor {
- private:
-  long pingTimeout;
-  unsigned long startTime;
-  bool pingWasSentInLastIteration = false;
+  private:
+    long pingTimeout;
+    unsigned long startTime;
+    bool pingWasSentInLastIteration = false;
+    bool alivePingWasSent = false;
 
-  DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+    DynamicJsonDocument
+    extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+    void publishPing();
 
- public:
-  MQTTDevicePing(MQTTDeviceInfo deviceInfo, String uniqueId, long pingTimeout = 60000);
-  void publishMeasurement();
-  void reset();
+  public:
+    MQTTDevicePing(MQTTDeviceInfo deviceInfo, String uniqueId, long pingTimeout = 60000);
+    void publishMeasurement();
+    void reset();
 };
 
 class MQTTDoorSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {

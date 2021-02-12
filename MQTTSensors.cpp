@@ -4,24 +4,32 @@ MQTTDevicePingDeviceClassificationFactory::MQTTDevicePingDeviceClassificationFac
     : MQTTDeviceClassificationFactory(deviceUniqueId) {}
 
 MQTTDeviceClassification MQTTDevicePingDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "connectivity", "binary_sensor", "ping", true};
-  return deviceClass;
+    MQTTDeviceClassification deviceClass = {deviceUniqueId, "connectivity", "binary_sensor", "ping", true};
+    return deviceClass;
 }
 
 MQTTDevicePing::MQTTDevicePing(MQTTDeviceInfo deviceInfo, String uniqueId, long pingTimeout)
     : MQTTSensor(new MQTTDevicePingDeviceClassificationFactory(uniqueId), deviceInfo) {
-  this->pingTimeout = pingTimeout;
-  // We want an immediate ping
-  startTime = millis() + pingTimeout + 1;
+    this->pingTimeout = pingTimeout;
+    // We want an immediate ping
+    startTime = millis() + pingTimeout + 1;
 }
 
 void MQTTDevicePing::publishMeasurement() {
-  unsigned long currentTime = millis();
-  if (currentTime - startTime > pingTimeout) {
+    if (!alivePingWasSent) {
+        publishPing();
+        alivePingWasSent = true;
+    }
+    unsigned long currentTime = millis();
+    if (currentTime - startTime > pingTimeout) {
+        publishPing();
+        startTime = millis();
+    }
+}
+
+void MQTTDevicePing::publishPing() {
     publishBinaryMessage(true);
     logLineToSerial("Ping published!");
-    startTime = millis();
-  }
 }
 
 DynamicJsonDocument MQTTDevicePing::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
