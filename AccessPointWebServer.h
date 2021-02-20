@@ -74,10 +74,12 @@ const String SETTINGS_PAGE_SUBMIT_FORM = R"=====(
                                 </p>
                               </fieldset>
                               <fieldset>
-                              <legend>Homeassistant Settings</legend>
+                              <legend>General Settings</legend>
                                 <p>
                                   <label for="device_name">Device Name:</label> <input id="device_name" name="device_name" type="text" value="change me"/><br /><br />
                                   <label for="homeassistant_autoconfig_prefix">Homeassistant Autoconfigure Prefix:</label> <input id="homeassistant_autoconfig_prefix" name="homeassistant_autoconfig_prefix" type="text" value="homeassistant"/><br /><br />
+                                  <label for="update_server">Update Server:</label> <input id="update_server" name="update_server" type="text" value=""/><br /><br />
+                                  <label for="update_server_port">Update Server Port:</label> <input id="update_server_port" name="update_server_port" type="number" value=""/><br /><br />
                                 </p>
                               </fieldset>
                               <input type="submit" value="Submit" class="button button2"/>
@@ -99,6 +101,12 @@ const String WIFI_CONNECTION_FAILED_MESSAGE = R"=====(
 const String MQTT_CONNECTION_FAILED_MESSAGE = R"=====(
                               <div style="background-color:#f44336; padding: 18px">
                                 <strong>MQTT Connection could not be established!</strong> Check the given MQTT broker in combination with the provided credentials
+                              </div>
+                              )=====";
+
+const String UPDATE_SERVER_NOT_REACHED_MESSAGE = R"=====(
+                              <div style="background-color:#f44336; padding: 18px">
+                                <strong>Connection to update server could not be established!</strong> Check the given update server address
                               </div>
                               )=====";
 

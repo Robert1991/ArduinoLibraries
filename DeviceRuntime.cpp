@@ -6,30 +6,43 @@ MQTTDeviceService *mqttDeviceService;
 MQTTDeviceInfo deviceInfo;
 
 // intern
+DeviceUpdateService *deviceUpdateService;
 DNSServer dnsServer;
 boolean configureMode = false;
+unsigned long updateTimer = millis();
 
-void setupDevice(WiFiClient &espClient, const String deviceId, int resetButtonPin, const String pingId,
-                 const String resetSwitchId, void mqttSetupFunction()) {
+void setupDevice(WiFiClient &espClient, const String deviceId, const int buildNumber, int resetButtonPin,
+                 const String pingId, const String resetSwitchId, void mqttSetupFunction()) {
   mountFileSystem();
   checkForConfigurationReset(resetButtonPin);
   if (rootConfig->read()) {
-    setupWifiConnection(rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName());
-    setupMqttDeviceService(espClient, deviceId, pingId, resetSwitchId);
-    mqttSetupFunction();
-    mqttDeviceService->setupMQTTDevices();
-  } else {
-    dnsServer = setupSoftAccessPointWithDnsServer("ROBOTronix_" + deviceId, "configure.me");
-    configureWebServer();
-    configureMode = true;
+    if (setupWifiConnection(rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName(),
+                            WIFI_STA, 30)) {
+      setupMqttDeviceService(espClient, deviceId, buildNumber, pingId, resetSwitchId);
+      mqttSetupFunction();
+      mqttDeviceService->setupMQTTDevices();
+      if (rootConfig->updateServerSet()) {
+        String deviceVersion = deviceId + "-" + VERSION + "-" + buildNumber;
+        setupUpdateService(espClient, rootConfig->updateServer, rootConfig->updateServerPort, deviceVersion);
+      }
+      return;
+    }
   }
+  dnsServer = setupSoftAccessPointWithDnsServer(MANUFACTURER + "_" + deviceId, "configure.me");
+  configureWebServer();
+  configureMode = true;
 }
 
 void loopDevice(int delayTimeout) {
+
   if (configureMode) {
     dnsServer.processNextRequest();
     handleWebServerClient();
   } else {
+    if (deviceUpdateService && (millis() - updateTimer) / 1000 >= 30) {
+      deviceUpdateService->installUpdateIfPossible();
+      updateTimer = millis();
+    }
     checkWifiStatus(rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName());
     mqttDeviceService->executeLoop();
   }
@@ -78,11 +91,16 @@ void configureStandardMQTTOperations(MQTTDeviceService *deviceService, MQTTDevic
   deviceService->setResetStateConsumer(resetSwitch);
 }
 
-void setupMqttDeviceService(WiFiClient &espClient, const String deviceId, const String pingId,
-                            const String resetSwitchId) {
+void setupMqttDeviceService(WiFiClient &espClient, const String deviceId, const int buildNumber,
+                            const String pingId, const String resetSwitchId) {
   mqttDeviceService = rootConfig->createMQTTDeviceService(espClient, messageReceived);
-  deviceInfo = rootConfig->createMQTTDeviceInfo(deviceId, "Node MCU");
+  deviceInfo = rootConfig->createMQTTDeviceInfo(deviceId, buildNumber, "Node MCU");
   configureStandardMQTTOperations(mqttDeviceService, deviceInfo, pingId, resetSwitchId);
+}
+
+void setupUpdateService(WiFiClient &client, String server, int port, String deviceVersion) {
+  deviceUpdateService = new DeviceUpdateService(client, server, port, deviceVersion);
+  deviceUpdateService->setup();
 }
 
 void messageReceived(String &topic, String &payload) {

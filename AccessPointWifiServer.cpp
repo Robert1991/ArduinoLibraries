@@ -4,6 +4,7 @@ ESP8266WebServer webServer(80);
 
 boolean lastWifiConnectionCheckSuccessful = true;
 boolean lastMQTTConnectionCheckSuccessful = true;
+boolean lastUpdateServerConnectionCheckSuccessful = true;
 boolean lastInputWasIncomplete = false;
 boolean connectionWasTested = false;
 
@@ -32,6 +33,7 @@ void handleRoot() {
 }
 
 void handleConfigSubmit() {
+  resetSettingsCheck();
   Serial.println("Settings submitted");
   for (uint8_t i = 0; i < webServer.args(); i++) {
     Serial.println(webServer.argName(i));
@@ -56,11 +58,17 @@ void handleConfigSubmit() {
 void resetSettingsCheck() {
   lastWifiConnectionCheckSuccessful = true;
   lastMQTTConnectionCheckSuccessful = true;
+  lastUpdateServerConnectionCheckSuccessful = true;
   lastInputWasIncomplete = false;
   connectionWasTested = false;
 }
 
 boolean submittedSettingsAreComplete() {
+  if (webServer.arg("update_server").length() > 0) {
+    if (webServer.arg("update_server_port").length() == 0) {
+      return false;
+    }
+  }
   return webServer.arg("wifissid").length() > 0 && webServer.arg("wifipasswd").length() > 0 &&
          webServer.arg("mqttbroker").length() > 0 && webServer.arg("mqttbroker_port").length() > 0 &&
          webServer.arg("device_name").length() > 0 &&
@@ -68,12 +76,19 @@ boolean submittedSettingsAreComplete() {
 }
 
 boolean submittedSettingsAreValid() {
-  int maxTries = 8;
+  int maxTries = 20;
   lastWifiConnectionCheckSuccessful =
       testWifiConnection(webServer.arg("wifissid"), webServer.arg("wifipasswd"), maxTries);
   if (lastWifiConnectionCheckSuccessful) {
     lastMQTTConnectionCheckSuccessful = testMqttClient();
-    return lastMQTTConnectionCheckSuccessful;
+    if (lastMQTTConnectionCheckSuccessful && webServer.arg("update_server").length() > 0) {
+      lastUpdateServerConnectionCheckSuccessful = pingServer(webServer.arg("update_server"));
+      Serial.print("update server check was successful: ");
+      Serial.println(lastUpdateServerConnectionCheckSuccessful);
+      return lastUpdateServerConnectionCheckSuccessful;
+    } else {
+      return lastMQTTConnectionCheckSuccessful;
+    }
   }
   return false;
 }
@@ -116,6 +131,8 @@ void storeSubmittedSettings() {
   }
   deviceConfig->deviceName = webServer.arg("device_name");
   deviceConfig->homeassistantAutoConfigurePrefix = webServer.arg("homeassistant_autoconfig_prefix");
+  deviceConfig->updateServer = webServer.arg("update_server");
+  deviceConfig->updateServerPort = webServer.arg("update_server_port").toInt();
   deviceConfig->writeCurrent();
 }
 
@@ -124,13 +141,16 @@ void sendToClient(String response) { webServer.send(200, "text/html", response);
 String buildSettingsPage() {
   String settingsPageHead = "<html lang=\"en\">" + SETTINGS_PAGE_HEAD;
   String settingsPageBody = SETTINGS_PAGE_BODY_HEADER;
-  if (connectionWasTested && lastWifiConnectionCheckSuccessful && lastMQTTConnectionCheckSuccessful) {
+  if (!lastInputWasIncomplete && connectionWasTested && lastWifiConnectionCheckSuccessful &&
+      lastMQTTConnectionCheckSuccessful) {
     settingsPageBody += SETTINGS_SUCCESSFULLY_SETUP_MESSAGE;
   } else {
     if (!lastWifiConnectionCheckSuccessful) {
       settingsPageBody += WIFI_CONNECTION_FAILED_MESSAGE;
     } else if (!lastMQTTConnectionCheckSuccessful) {
       settingsPageBody += MQTT_CONNECTION_FAILED_MESSAGE;
+    } else if (!lastUpdateServerConnectionCheckSuccessful) {
+      settingsPageBody += UPDATE_SERVER_NOT_REACHED_MESSAGE;
     } else if (lastInputWasIncomplete) {
       settingsPageBody += SETTINGS_INCOMPLETE_MESSAGE;
     }

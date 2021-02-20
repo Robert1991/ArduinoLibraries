@@ -18,9 +18,11 @@ struct MQTTDeviceClassification {
 struct MQTTDeviceInfo {
   String uniqueId;
   String deviceName;
+  String deviceFriendlyName;
   String autoDiscoveryPrefix;
   String deviceType;
   String manufacturer;
+  String firmwareVersion;
 };
 
 class MQTTDeviceClassificationFactory {

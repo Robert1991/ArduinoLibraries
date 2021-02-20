@@ -6,6 +6,7 @@
 #include <ESPFileUtils.h>
 #include <EasyButton.h>
 #include <MQTTDevices.h>
+#include <VERSION.h>
 
 const String WIFI_CONFIG_PATH = "/wifi_config.json";
 const String MQTT_CONFIG_PATH = "/mqtt_config.json";
@@ -27,17 +28,21 @@ public:
   String mqttPasswd;
   String deviceName;
   String homeassistantAutoConfigurePrefix;
+  String updateServer = "";
+  int updateServerPort;
 
   String getCleanedDeviceName();
   boolean deviceWasConfigured();
   boolean read();
   boolean writeCurrent();
   boolean deleteConfig();
+  boolean updateServerSet();
   MQTTDeviceService *createMQTTDeviceService(WiFiClient &wifiClient,
                                              MQTTClientCallbackSimple messageReceivedCallback,
                                              boolean verbose = true, int publisherCacheSize = 10,
                                              int subscriberCacheSize = 10, int mqttCacheSize = 750);
-  MQTTDeviceInfo createMQTTDeviceInfo(const String deviceId, const String deviceType = "Node MCU");
+  MQTTDeviceInfo createMQTTDeviceInfo(const String deviceId, int buildNumber,
+                                      const String deviceType = "Node MCU");
 };
 
 #endif

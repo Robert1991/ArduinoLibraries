@@ -53,9 +53,10 @@ DynamicJsonDocument MQTTDevice::createDeviceInfoJsonObject() {
   autoConfigureJsonDocument["stat_t"] = stateTopic;
   autoConfigureJsonDocument["uniq_id"] = deviceClassification.sensorUniqueId;
   autoConfigureJsonDocument["dev"]["ids"][0] = deviceInfo.uniqueId;
-  autoConfigureJsonDocument["dev"]["name"] = deviceInfo.deviceName;
+  autoConfigureJsonDocument["dev"]["name"] = deviceInfo.deviceFriendlyName;
   autoConfigureJsonDocument["dev"]["mdl"] = deviceInfo.deviceType;
   autoConfigureJsonDocument["dev"]["mf"] = deviceInfo.manufacturer;
+  autoConfigureJsonDocument["dev"]["sw"] = deviceInfo.firmwareVersion;
   return autoConfigureJsonDocument;
 }
 

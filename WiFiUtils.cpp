@@ -1,6 +1,7 @@
 #include <WiFiUtils.h>
 
-void setupWifiConnection(const String ssid, const String password, const String hostName, WiFiMode wifiMode) {
+boolean setupWifiConnection(const String ssid, const String password, const String hostName,
+                            WiFiMode wifiMode, int maxTries) {
   if (hostName.length() > 0) {
     Serial.print("setting hostname: ");
     Serial.println(hostName);
@@ -13,14 +14,21 @@ void setupWifiConnection(const String ssid, const String password, const String 
   Serial.println(" ...");
 
   WiFi.mode(wifiMode);
-  while (WiFi.status() != WL_CONNECTED) {
+
+  int currentTry = 0;
+  while (WiFi.status() != WL_CONNECTED && currentTry < maxTries) {
+    currentTry += 1;
     Serial.println("Waiting for connection...");
     delay(1000);
   }
 
-  Serial.println("Connection established!");
-  Serial.print("IP address:\t");
-  Serial.println(WiFi.localIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("Connection established!");
+    Serial.print("IP address:\t");
+    Serial.println(WiFi.localIP());
+    return true;
+  }
+  return false;
 }
 
 boolean testWifiConnection(const String ssid, const String password, int maxTries) {
@@ -73,4 +81,19 @@ void checkWifiStatus(const String ssid, const String password, const String host
     }
     return;
   }
+}
+
+Pinger pinger;
+
+boolean pingServer(String server) {
+  IPAddress invalid(255, 255, 255, 255);
+  IPAddress serverIP;
+
+  WiFi.hostByName(server.c_str(), serverIP);
+  Serial.print("Resolved server url: " + server + " to ip: ");
+  Serial.println(serverIP);
+  if (serverIP == invalid) {
+    return false;
+  }
+  return pinger.Ping(serverIP);
 }

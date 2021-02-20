@@ -7,6 +7,8 @@ String DeviceRootConfig::getCleanedDeviceName() {
   return deviceNameCleaned;
 }
 
+boolean DeviceRootConfig::updateServerSet() { return updateServer.length() > 0; }
+
 boolean DeviceRootConfig::read() {
   if (fileExists(WIFI_CONFIG_PATH) && fileExists(MQTT_CONFIG_PATH)) {
     DynamicJsonDocument wifiConfig = deserializeFileContent(WIFI_CONFIG_PATH, 256);
@@ -22,6 +24,8 @@ boolean DeviceRootConfig::read() {
     this->mqttPasswd = (const char *)mqttConfig["mqtt_pass"];
     this->deviceName = (const char *)mqttConfig["device_name"];
     this->homeassistantAutoConfigurePrefix = (const char *)mqttConfig["auto_conf_prefix"];
+    this->updateServer = (const char *)mqttConfig["update_server"];
+    this->updateServerPort = mqttConfig["update_server_port"];
 
     return true;
   }
@@ -46,6 +50,8 @@ boolean DeviceRootConfig::writeCurrent() {
   mqttConfig["mqtt_pass"] = mqttPasswd;
   mqttConfig["device_name"] = deviceName;
   mqttConfig["auto_conf_prefix"] = homeassistantAutoConfigurePrefix;
+  mqttConfig["update_server"] = updateServer;
+  mqttConfig["update_server_port"] = updateServerPort;
 
   writeJsonDocumentToFile(MQTT_CONFIG_PATH, mqttConfig);
 
@@ -93,8 +99,11 @@ MessageQueueClient *DeviceRootConfig::createMessageQueueClient(WiFiClient &wifiC
   return mqttClient;
 }
 
-MQTTDeviceInfo DeviceRootConfig::createMQTTDeviceInfo(const String deviceId, const String deviceType) {
-  MQTTDeviceInfo deviceInfo = {deviceId, getCleanedDeviceName(), homeassistantAutoConfigurePrefix, deviceType,
-                               "RoboTronix"};
+MQTTDeviceInfo DeviceRootConfig::createMQTTDeviceInfo(const String deviceId, const int buildNumber,
+                                                      const String deviceType) {
+  String deviceVersion = VERSION + "-" + buildNumber;
+  MQTTDeviceInfo deviceInfo = {
+      deviceId,   getCleanedDeviceName(), deviceName,   homeassistantAutoConfigurePrefix,
+      deviceType, MANUFACTURER,           deviceVersion};
   return deviceInfo;
 }
