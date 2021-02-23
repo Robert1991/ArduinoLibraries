@@ -1,7 +1,7 @@
 #include <WiFiUtils.h>
 
-boolean setupWifiConnection(const String ssid, const String password, const String hostName,
-                            WiFiMode wifiMode, int maxTries) {
+wifi_connection_status setupWifiConnection(const String ssid, const String password, const String hostName,
+                                           WiFiMode wifiMode, int maxTries) {
   if (hostName.length() > 0) {
     Serial.print("setting hostname: ");
     Serial.println(hostName);
@@ -16,7 +16,18 @@ boolean setupWifiConnection(const String ssid, const String password, const Stri
   WiFi.mode(wifiMode);
 
   int currentTry = 0;
-  while (WiFi.status() != WL_CONNECTED && currentTry < maxTries) {
+
+  while (WiFi.status() != WL_CONNECTED && (currentTry < maxTries || maxTries == 0)) {
+    station_status_t status = wifi_station_get_connect_status();
+    Serial.println(status);
+    if (status == STATION_WRONG_PASSWORD) {
+      Serial.println("Wrong password for connection...");
+      return WRONG_PASSWORD;
+    }
+    if (WiFi.status() == WL_NO_SSID_AVAIL) {
+      Serial.println("WiFi SSID not found...");
+      return SSID_NOT_FOUND;
+    }
     currentTry += 1;
     Serial.println("Waiting for connection...");
     delay(1000);
@@ -26,9 +37,9 @@ boolean setupWifiConnection(const String ssid, const String password, const Stri
     Serial.println("Connection established!");
     Serial.print("IP address:\t");
     Serial.println(WiFi.localIP());
-    return true;
+    return CONNECTED;
   }
-  return false;
+  return CONNECTION_NOT_POSSIBLE;
 }
 
 boolean testWifiConnection(const String ssid, const String password, int maxTries) {

@@ -16,8 +16,9 @@ void setupDevice(WiFiClient &espClient, const String deviceId, const int buildNu
   mountFileSystem();
   checkForConfigurationReset(resetButtonPin);
   if (rootConfig->read()) {
-    if (setupWifiConnection(rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName(),
-                            WIFI_STA, 30)) {
+    wifi_connection_status connection_status = setupWifiConnection(
+        rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName(), WIFI_STA, 40);
+    if (connection_status == CONNECTED) {
       setupMqttDeviceService(espClient, deviceId, buildNumber, pingId, resetSwitchId);
       mqttSetupFunction();
       mqttDeviceService->setupMQTTDevices();
@@ -26,7 +27,11 @@ void setupDevice(WiFiClient &espClient, const String deviceId, const int buildNu
         setupUpdateService(espClient, rootConfig->updateServer, rootConfig->updateServerPort, deviceVersion);
       }
       return;
+    } else if (connection_status == CONNECTION_NOT_POSSIBLE) {
+      Serial.println("WiFi Connection failed, restarting device...");
+      ESP.restart();
     }
+    Serial.println("WiFi Connection failed. SSID or password wrong, starting access point...");
   }
   dnsServer = setupSoftAccessPointWithDnsServer(MANUFACTURER + "_" + deviceId, "configure.me");
   configureWebServer();
@@ -82,6 +87,13 @@ void onResetRequested() {
   }
 }
 
+void setupMqttDeviceService(WiFiClient &espClient, const String deviceId, const int buildNumber,
+                            const String pingId, const String resetSwitchId) {
+  mqttDeviceService = rootConfig->createMQTTDeviceService(espClient, messageReceived);
+  deviceInfo = rootConfig->createMQTTDeviceInfo(deviceId, buildNumber, "Node MCU");
+  configureStandardMQTTOperations(mqttDeviceService, deviceInfo, pingId, resetSwitchId);
+}
+
 void configureStandardMQTTOperations(MQTTDeviceService *deviceService, MQTTDeviceInfo deviceInfo,
                                      const String pingId, const String resetSwitchId) {
 
@@ -89,13 +101,6 @@ void configureStandardMQTTOperations(MQTTDeviceService *deviceService, MQTTDevic
   deviceService->addPublisher(devicePing);
   MQTTDeviceResetSwitch *resetSwitch = new MQTTDeviceResetSwitch(deviceInfo, resetSwitchId);
   deviceService->setResetStateConsumer(resetSwitch);
-}
-
-void setupMqttDeviceService(WiFiClient &espClient, const String deviceId, const int buildNumber,
-                            const String pingId, const String resetSwitchId) {
-  mqttDeviceService = rootConfig->createMQTTDeviceService(espClient, messageReceived);
-  deviceInfo = rootConfig->createMQTTDeviceInfo(deviceId, buildNumber, "Node MCU");
-  configureStandardMQTTOperations(mqttDeviceService, deviceInfo, pingId, resetSwitchId);
 }
 
 void setupUpdateService(WiFiClient &client, String server, int port, String deviceVersion) {
