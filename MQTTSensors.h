@@ -1,6 +1,7 @@
 #ifndef MQTTSensors_h
 #define MQTTSensors_h
 
+#include "Adafruit_ADS1015.h"
 #include "DHT.h"
 #include "MQTTDevice.h"
 
@@ -170,6 +171,38 @@ public:
   MQTTTemperatureSensor(MQTTDeviceInfo deviceInfo, DHT *dhtSensor, String sensorUniqueId,
                         int resetValuesIterations = 5000);
   DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+  void publishMeasurement();
+  void reset();
+};
+
+class MQTTAnalogConverterSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+private:
+  String sensorName;
+
+public:
+  MQTTAnalogConverterSensorDeviceClassificationFactory(String deviceUniqueId, String sensorName);
+  MQTTDeviceClassification create();
+};
+
+class MQTTAnalogConverterSensor : public MQTTSensor {
+private:
+  String attributesTopic;
+  Adafruit_ADS1015 *converter;
+  int analogPort;
+  int valueDelta;
+  int minValue;
+  int maxValue;
+  int16_t lastValue = 0;
+
+  float calculatePercentageValue(int currentSensorValue);
+  void publishAbsoluteValues(int currentValue);
+  DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+
+public:
+  MQTTAnalogConverterSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId, Adafruit_ADS1015 *converter,
+                            int analogPort, String sensorName, int minValue, int maxValue,
+                            int valueDelta = 100);
+  void setupSensor();
   void publishMeasurement();
   void reset();
 };

@@ -311,3 +311,75 @@ MQTTTemperatureSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigure
   autoConfigureJsonDocument["unit_of_meas"] = "°C";
   return autoConfigureJsonDocument;
 }
+
+MQTTAnalogConverterSensorDeviceClassificationFactory::MQTTAnalogConverterSensorDeviceClassificationFactory(
+    String deviceUniqueId, String sensorName)
+    : MQTTDeviceClassificationFactory(deviceUniqueId) {
+  this->sensorName = sensorName;
+}
+
+MQTTDeviceClassification MQTTAnalogConverterSensorDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "humidity", "sensor", sensorName, true};
+  return deviceClass;
+}
+
+MQTTAnalogConverterSensor::MQTTAnalogConverterSensor(MQTTDeviceInfo deviceInfo, String sensorUniqueId,
+                                                     Adafruit_ADS1015 *converter, int analogPort,
+                                                     String sensorName, int minValue, int maxValue,
+                                                     int valueDelta)
+    : MQTTSensor(new MQTTAnalogConverterSensorDeviceClassificationFactory(sensorUniqueId, sensorName),
+                 deviceInfo) {
+  this->converter = converter;
+  this->analogPort = analogPort;
+  this->valueDelta = valueDelta;
+  this->minValue = minValue;
+  this->maxValue = maxValue;
+
+  this->attributesTopic = sensorHomeAssistantPath + "/attributes";
+}
+
+void MQTTAnalogConverterSensor::setupSensor() { converter->begin(); }
+
+DynamicJsonDocument
+MQTTAnalogConverterSensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+  autoConfigureJsonDocument["json_attr_t"] = attributesTopic;
+  autoConfigureJsonDocument["unit_of_meas"] = "%";
+  return autoConfigureJsonDocument;
+}
+
+void MQTTAnalogConverterSensor::publishMeasurement() {
+  int16_t currentSensorValue = converter->readADC_SingleEnded(analogPort);
+  if (abs(lastValue - currentSensorValue) > valueDelta) {
+    lastValue = currentSensorValue;
+    float percentage = calculatePercentageValue(currentSensorValue);
+    logToSerial("Current Percentage: ");
+    logLineToSerial(percentage);
+    logToSerial("Analog sensor value from port ");
+    logToSerial(analogPort);
+    logToSerial(": ");
+    logLineToSerial(currentSensorValue);
+    publishFloatValue(percentage);
+    publishAbsoluteValues(currentSensorValue);
+  }
+}
+
+float MQTTAnalogConverterSensor::calculatePercentageValue(int currentSensorValue) {
+  float percentage = 100.0 * (1.0 * currentSensorValue - minValue) / (maxValue - minValue);
+  // Value needs to be inverted, because 100.0 is dry
+  if (percentage >= 100.0) {
+    return 0.0;
+  } else if (percentage <= 0.0) {
+    return 100.0;
+  }
+  return 100.0 - percentage;
+}
+
+void MQTTAnalogConverterSensor::publishAbsoluteValues(int currentValue) {
+  DynamicJsonDocument stateAttributes = createJsonDocument(256);
+  stateAttributes["raw"] = currentValue;
+  stateAttributes["min_value"] = minValue;
+  stateAttributes["max_value"] = maxValue;
+  publishJsonDocument(attributesTopic, stateAttributes);
+}
+
+void MQTTAnalogConverterSensor::reset() { lastValue = 0; }
