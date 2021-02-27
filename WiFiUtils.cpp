@@ -30,7 +30,7 @@ wifi_connection_status setupWifiConnection(const String ssid, const String passw
     }
     currentTry += 1;
     Serial.println("Waiting for connection...");
-    delay(1000);
+    delay(500);
   }
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -82,13 +82,17 @@ DNSServer setupSoftAccessPointWithDnsServer(String ssid, String domainName) {
 
 unsigned long last_wifi_reconnect_attempt = 0;
 
-void checkWifiStatus(const String ssid, const String password, const String hostname) {
+void checkWifiStatus(const String ssid, const String password, const String hostname, WiFiMode wifiMode,
+                     int maxReconnectTries) {
   if (WiFi.status() != WL_CONNECTED) {
     unsigned long now = millis();
     if (now - last_wifi_reconnect_attempt > 20000UL || last_wifi_reconnect_attempt == 0) {
       Serial.println("Attempting to connect to WiFi");
       last_wifi_reconnect_attempt = now;
-      setupWifiConnection(ssid, password, hostname);
+      WiFi.disconnect();
+      WiFi.mode(WIFI_OFF);
+      WiFi.mode(WIFI_STA);
+      setupWifiConnection(ssid, password, hostname, wifiMode, maxReconnectTries);
     }
     return;
   }
