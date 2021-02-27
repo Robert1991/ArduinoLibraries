@@ -27,19 +27,25 @@ public:
   void reset();
 };
 
-class MQTTDoorSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+class MQTTInputPullUpSensorDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+private:
+  String deviceClass;
+  String sensorStateName;
+
 public:
-  MQTTDoorSensorDeviceClassificationFactory(String deviceUniqueId);
+  MQTTInputPullUpSensorDeviceClassificationFactory(String deviceUniqueId, String deviceClass,
+                                                   String sensorStateName);
   MQTTDeviceClassification create();
 };
 
-class MQTTDoorSensor : public MQTTSensor {
+class MQTTInputPullUpSensor : public MQTTSensor {
 private:
-  bool doorIsOpen = false;
-  int doorSensorPin;
+  bool inputPinIsHigh = false;
+  int inputPin;
 
 public:
-  MQTTDoorSensor(MQTTDeviceInfo deviceInfo, String uniqueId, int doorSensorPin);
+  MQTTInputPullUpSensor(MQTTDeviceInfo deviceInfo, String uniqueId, int inputPin, String deviceClass,
+                        String sensorStateName);
   void setupSensor();
   void publishMeasurement();
   void reset();

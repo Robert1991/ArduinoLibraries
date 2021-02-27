@@ -40,38 +40,45 @@ DynamicJsonDocument MQTTDevicePing::extendAutoDiscoveryInfo(DynamicJsonDocument 
 
 void MQTTDevicePing::reset() { startTime = millis() + pingTimeout + 1; }
 
-MQTTDoorSensorDeviceClassificationFactory::MQTTDoorSensorDeviceClassificationFactory(String deviceUniqueId)
-    : MQTTDeviceClassificationFactory(deviceUniqueId) {}
+MQTTInputPullUpSensorDeviceClassificationFactory::MQTTInputPullUpSensorDeviceClassificationFactory(
+    String deviceUniqueId, String deviceClass, String sensorStateName)
+    : MQTTDeviceClassificationFactory(deviceUniqueId) {
+  this->deviceClass = deviceClass;
+  this->sensorStateName = sensorStateName;
+}
 
-MQTTDeviceClassification MQTTDoorSensorDeviceClassificationFactory::create() {
-  MQTTDeviceClassification deviceClass = {deviceUniqueId, "door", "binary_sensor", "door_open", true};
+MQTTDeviceClassification MQTTInputPullUpSensorDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, this->deviceClass, "binary_sensor", sensorStateName,
+                                          true};
   return deviceClass;
 }
 
-MQTTDoorSensor::MQTTDoorSensor(MQTTDeviceInfo deviceInfo, String uniqueId, int doorSensorPin)
-    : MQTTSensor(new MQTTDoorSensorDeviceClassificationFactory(uniqueId), deviceInfo) {
-  this->doorSensorPin = doorSensorPin;
+MQTTInputPullUpSensor::MQTTInputPullUpSensor(MQTTDeviceInfo deviceInfo, String uniqueId, int inputPin,
+                                             String deviceClass, String sensorStateName)
+    : MQTTSensor(new MQTTInputPullUpSensorDeviceClassificationFactory(uniqueId, deviceClass, sensorStateName),
+                 deviceInfo) {
+  this->inputPin = inputPin;
 }
 
-void MQTTDoorSensor::setupSensor() { pinMode(doorSensorPin, INPUT_PULLUP); }
+void MQTTInputPullUpSensor::setupSensor() { pinMode(inputPin, INPUT_PULLUP); }
 
-void MQTTDoorSensor::publishMeasurement() {
-  int doorState = digitalRead(doorSensorPin);
+void MQTTInputPullUpSensor::publishMeasurement() {
+  int inputPinState = digitalRead(inputPin);
 
-  if (doorState == HIGH && !doorIsOpen) {
-    doorIsOpen = true;
+  if (inputPinState == HIGH && !inputPinIsHigh) {
+    inputPinIsHigh = true;
     publishBinaryMessage(true);
-  } else if (doorState == LOW && doorIsOpen) {
-    doorIsOpen = false;
+  } else if (inputPinState == LOW && inputPinIsHigh) {
+    inputPinIsHigh = false;
     publishBinaryMessage(false);
   }
 }
 
-void MQTTDoorSensor::reset() {
-  if (doorIsOpen) {
-    doorIsOpen = false;
+void MQTTInputPullUpSensor::reset() {
+  if (inputPinIsHigh) {
+    inputPinIsHigh = false;
   } else {
-    doorIsOpen = true;
+    inputPinIsHigh = true;
   }
 }
 
@@ -220,8 +227,6 @@ void MQTTDHTSensor::setupSensor() { dhtSensor->begin(); }
 
 bool MQTTDHTSensor::resetIfRequired() {
   if (currentIteration < resetValuesIterations) {
-    logToSerial("current iteration: ");
-    logLineToSerial(currentIteration);
     currentIteration++;
     return false;
   }
