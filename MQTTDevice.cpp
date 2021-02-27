@@ -67,15 +67,11 @@ DynamicJsonDocument MQTTDevice::createJsonDocument(int capacity) {
 }
 
 void MQTTDevice::configureViaBroker() {
-  if (deregisterDeviceInOrigin()) {
-    logLineToSerial("Device deregistered!");
-    delay(500);
-
-    DynamicJsonDocument autoConfigureJsonDocument = createDeviceInfoJsonObject();
-    autoConfigureJsonDocument = extendAutoDiscoveryInfo(autoConfigureJsonDocument);
-    if (publishAutoDiscoveryInfo(autoConfigureJsonDocument)) {
-      logLineToSerial("Configure message successfully sent!");
-    }
+  DynamicJsonDocument autoConfigureJsonDocument = createDeviceInfoJsonObject();
+  autoConfigureJsonDocument = extendAutoDiscoveryInfo(autoConfigureJsonDocument);
+  if (publishAutoDiscoveryInfo(autoConfigureJsonDocument)) {
+    logLineToSerial("Configure message successfully sent!");
+    delay(100);
   }
 }
 

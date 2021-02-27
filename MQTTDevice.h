@@ -44,7 +44,6 @@ private:
   DynamicJsonDocument createDeviceInfoJsonObject();
   void assignDeviceInfos(MQTTDeviceClassification deviceClass, MQTTDeviceInfo deviceInfo);
   int publishAutoDiscoveryInfo(DynamicJsonDocument jsonDocument);
-  bool deregisterDeviceInOrigin();
 
 protected:
   String sensorHomeAssistantPath;
