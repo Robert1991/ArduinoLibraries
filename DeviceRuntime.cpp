@@ -17,7 +17,7 @@ void setupDevice(WiFiClient &espClient, const String deviceId, const int buildNu
   checkForConfigurationReset(resetButtonPin);
   if (rootConfig->read()) {
     wifi_connection_status connection_status = setupWifiConnection(
-        rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName(), WIFI_STA, 40);
+        rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName(), WIFI_STA, 12);
     if (connection_status == CONNECTED) {
       setupMqttDeviceService(espClient, deviceId, buildNumber, pingId, resetSwitchId);
       mqttSetupFunction();
