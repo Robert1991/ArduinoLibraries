@@ -75,11 +75,6 @@ void MQTTDevice::configureViaBroker() {
   }
 }
 
-bool MQTTDevice::deregisterDeviceInOrigin() {
-  String emptyConfigureMessage = "";
-  return mqttClient->publishMessage(autoDiscoveryMQTTConfigureTopic, emptyConfigureMessage, true);
-}
-
 DynamicJsonDocument MQTTDevice::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
   return autoConfigureJsonDocument;
 }
