@@ -30,25 +30,28 @@ boolean MessageQueueClient::setupClient(WiFiClient &wifiClient,
 }
 
 int MessageQueueClient::publishMessage(String topic, String payload, bool retain) {
-  reconnectIfNecassary();
-  logToSerial("Publishing: topic: ");
-  logToSerial(topic);
-  logToSerial(" payload: ");
-  logLineToSerial(payload);
-  return mqttClient->publish(topic, payload, retain, 1);
+  if (reconnectIfNecassary()) {
+    logToSerial("Publishing: topic: ");
+    logToSerial(topic);
+    logToSerial(" payload: ");
+    logLineToSerial(payload);
+    return mqttClient->publish(topic, payload, retain, 1);
+  }
+  return -1;
 }
 
 void MessageQueueClient::subscribeTopic(String topic) {
-  reconnectIfNecassary();
-  logToSerial("Subscribing ");
-  logLineToSerial(topic);
-  if (subscribeTopicCount < subscriptionTopicBufferSize) {
-    subscribeTopicArray[subscribeTopicCount] = topic;
-    subscribeTopicCount++;
+  if (reconnectIfNecassary()) {
+    logToSerial("Subscribing ");
+    logLineToSerial(topic);
+    if (subscribeTopicCount < subscriptionTopicBufferSize) {
+      subscribeTopicArray[subscribeTopicCount] = topic;
+      subscribeTopicCount++;
+    }
+    bool subscriptionSuccessful = mqttClient->subscribe(topic);
+    logToSerial("Subscription return status: ");
+    logLineToSerial(subscriptionSuccessful);
   }
-  bool subscriptionSuccessful = mqttClient->subscribe(topic);
-  logToSerial("Subscription return status: ");
-  logLineToSerial(subscriptionSuccessful);
 }
 
 void MessageQueueClient::subscribeTopics(String subscribeTopics[], int countOfTopics) {
