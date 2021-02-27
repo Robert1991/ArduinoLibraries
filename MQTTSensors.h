@@ -158,6 +158,7 @@ private:
   float lastMeasuredHumidity = 0.0;
 
   void publishHumidity();
+  DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
 
 public:
   MQTTHumiditySensor(MQTTDeviceInfo deviceInfo, DHT *dhtSensor, String sensorUniqueId,

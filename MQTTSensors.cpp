@@ -272,6 +272,12 @@ void MQTTHumiditySensor::publishHumidity() {
   }
 }
 
+DynamicJsonDocument
+MQTTHumiditySensor::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+  autoConfigureJsonDocument["unit_of_meas"] = "%";
+  return autoConfigureJsonDocument;
+}
+
 void MQTTHumiditySensor::reset() { lastMeasuredHumidity = 0.0; }
 
 MQTTTemperatureSensorDeviceClassificationFactory::MQTTTemperatureSensorDeviceClassificationFactory(
