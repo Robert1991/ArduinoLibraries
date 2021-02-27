@@ -90,8 +90,8 @@ protected:
 
 public:
   MQTTActor(MQTTDeviceClassificationFactory *deviceClassFactory, MQTTDeviceInfo deviceInfo);
-  void initializePublisher(MessageQueueClient *mqttClient);
-  void configureInTargetPlatform();
+  virtual void initializePublisher(MessageQueueClient *mqttClient);
+  virtual void configureInTargetPlatform();
   void publishToTargetPlatform();
   void reset();
   virtual void setupActor() = 0;

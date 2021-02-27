@@ -1,6 +1,7 @@
 #ifndef MQTTActors_h
 #define MQTTActors_h
 
+#include "LiquidCrystal.h"
 #include <wireUtils.h>
 
 #include "MQTTDevice.h"
@@ -145,6 +146,34 @@ public:
   void setupSubscriptions();
   bool consumeMessage(String topic, String payload);
   void applyChoosenColorToLeds();
+};
+
+class MQTTLcdDisplayDeviceClassificationFactory : public MQTTDeviceClassificationFactory {
+private:
+  String deviceName;
+
+public:
+  MQTTLcdDisplayDeviceClassificationFactory(String deviceUniqueId, String deviceName);
+  MQTTDeviceClassification create();
+};
+
+class MQTTLcdDisplay : public MQTTActor {
+private:
+  LiquidCrystal *display;
+  String lastText = "";
+  void reportStatusInformation();
+
+public:
+  MQTTLcdDisplay(MQTTDeviceInfo deviceInfo, String uniqueId, LiquidCrystal *display,
+                 String deviceName = "show");
+
+  DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+  void setupActor();
+  void executeLoopMethod();
+  void setupSubscriptions();
+  void configureInTargetPlatform();
+  bool deregisterFromTargetPlatform();
+  bool consumeMessage(String topic, String payload);
 };
 
 #endif

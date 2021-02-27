@@ -411,3 +411,48 @@ void MQTTI2CRgbLight::applyChoosenColorToLeds() {
     }
   }
 }
+
+MQTTLcdDisplayDeviceClassificationFactory::MQTTLcdDisplayDeviceClassificationFactory(String deviceUniqueId,
+                                                                                     String deviceName)
+    : MQTTDeviceClassificationFactory(deviceUniqueId) {
+  this->deviceName = deviceName;
+}
+
+MQTTDeviceClassification MQTTLcdDisplayDeviceClassificationFactory::create() {
+  MQTTDeviceClassification deviceClass = {deviceUniqueId, "", "display", deviceName, false};
+  return deviceClass;
+}
+
+MQTTLcdDisplay::MQTTLcdDisplay(MQTTDeviceInfo deviceInfo, String uniqueId, LiquidCrystal *display,
+                               String deviceName)
+    : MQTTActor(new MQTTLcdDisplayDeviceClassificationFactory(uniqueId, deviceName), deviceInfo) {
+  this->display = display;
+  this->commandTopic = sensorHomeAssistantPath + "/" + "show";
+}
+
+void MQTTLcdDisplay::setupActor() { display->begin(16, 2); }
+
+void MQTTLcdDisplay::executeLoopMethod(){};
+
+void MQTTLcdDisplay::configureInTargetPlatform() {}
+
+bool MQTTLcdDisplay::deregisterFromTargetPlatform() {}
+
+void MQTTLcdDisplay::reportStatusInformation() { publishState(lastText); }
+
+DynamicJsonDocument MQTTLcdDisplay::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+  autoConfigureJsonDocument["cmd_t"] = commandTopic;
+  autoConfigureJsonDocument["ret"] = true;
+  return autoConfigureJsonDocument;
+}
+
+void MQTTLcdDisplay::setupSubscriptions() { subscribeTopic(commandTopic); }
+
+bool MQTTLcdDisplay::consumeMessage(String topic, String payload) {
+  if (topic.equals(commandTopic)) {
+    display->clear();
+    display->setCursor(0, 0);
+    display->print(payload);
+    lastText = payload;
+  }
+}
