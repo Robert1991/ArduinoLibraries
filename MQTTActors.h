@@ -20,6 +20,10 @@ private:
   String SWITCH_PAYLOAD_ON = "ON";
   String SWITCH_PAYLOAD_OFF = "OFF";
   int switchPin;
+  bool invertSignal = false;
+
+  void turnOn();
+  void turnOff();
 
 protected:
   bool switchOn = false;
@@ -27,7 +31,7 @@ protected:
 
 public:
   MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName = "relais_switch",
-             String deviceType = "light");
+             String deviceType = "light", bool invertSignal = false);
 
   DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
   virtual void setupActor();

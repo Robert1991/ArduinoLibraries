@@ -14,10 +14,11 @@ MQTTDeviceClassification MQTTSwitchDeviceClassificationFactory::create() {
 }
 
 MQTTSwitch::MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName,
-                       String deviceType)
+                       String deviceType, bool invertSignal)
     : MQTTActor(new MQTTSwitchDeviceClassificationFactory(uniqueId, deviceName, deviceType), deviceInfo) {
   this->commandTopic = deviceEntityName + "/" + "switch";
   this->switchPin = switchPin;
+  this->invertSignal = invertSignal;
 }
 
 DynamicJsonDocument MQTTSwitch::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
@@ -26,12 +27,31 @@ DynamicJsonDocument MQTTSwitch::extendAutoDiscoveryInfo(DynamicJsonDocument auto
   return autoConfigureJsonDocument;
 }
 
-void MQTTSwitch::setupActor() { pinMode(switchPin, OUTPUT); }
+void MQTTSwitch::setupActor() {
+  pinMode(switchPin, OUTPUT);
+  turnOff();
+}
 
 void MQTTSwitch::setupSubscriptions() { subscribeTopic(commandTopic); }
 
 void MQTTSwitch::executeLoopMethod() {
   if (switchOn) {
+    turnOn();
+  } else {
+    turnOff();
+  }
+}
+
+void MQTTSwitch::turnOn() {
+  if (invertSignal) {
+    digitalWrite(switchPin, LOW);
+  } else {
+    digitalWrite(switchPin, HIGH);
+  }
+}
+
+void MQTTSwitch::turnOff() {
+  if (invertSignal) {
     digitalWrite(switchPin, HIGH);
   } else {
     digitalWrite(switchPin, LOW);
