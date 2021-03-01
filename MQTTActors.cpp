@@ -97,6 +97,13 @@ void MQTTDeviceResetSwitch::executeLoopMethod() {
   }
 }
 
+DynamicJsonDocument
+MQTTDeviceResetSwitch::extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument) {
+  autoConfigureJsonDocument["cmd_t"] = commandTopic;
+  autoConfigureJsonDocument["ret"] = false;
+  return autoConfigureJsonDocument;
+}
+
 MQTTRgbLightDeviceClassificationFactory::MQTTRgbLightDeviceClassificationFactory(String uniqueId)
     : MQTTDeviceClassificationFactory(uniqueId) {}
 

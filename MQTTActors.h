@@ -34,7 +34,7 @@ public:
   MQTTSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, int switchPin, String deviceName = "relais_switch",
              String deviceType = "light", bool invertSignal = false);
 
-  DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+  virtual DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
   virtual void setupActor();
   virtual void executeLoopMethod();
   void setupSubscriptions();
