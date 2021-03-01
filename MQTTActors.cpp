@@ -450,9 +450,28 @@ void MQTTLcdDisplay::setupSubscriptions() { subscribeTopic(commandTopic); }
 
 bool MQTTLcdDisplay::consumeMessage(String topic, String payload) {
   if (topic.equals(commandTopic)) {
-    display->clear();
-    display->setCursor(0, 0);
-    display->print(payload);
-    lastText = payload;
+    logToSerial("Displaying: ");
+    logLineToSerial(payload);
+    displayMessage(payload);
   }
+}
+
+void MQTTLcdDisplay::displayMessage(String payload) {
+  display->clear();
+  int currentDisplayIndex = 0;
+  String currentLineDisplay = "";
+  for (int i = 0; i < payload.length(); i++) {
+    String currentChar = payload.substring(i, i + 1);
+    if (currentChar == "\n") {
+      display->setCursor(0, currentDisplayIndex);
+      display->print(currentLineDisplay);
+      currentLineDisplay = "";
+      currentDisplayIndex += 1;
+    } else {
+      currentLineDisplay += currentChar;
+    }
+  }
+  display->setCursor(0, currentDisplayIndex);
+  display->print(currentLineDisplay);
+  lastText = payload;
 }

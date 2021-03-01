@@ -44,8 +44,9 @@ public:
 class MQTTDeviceResetSwitch : public MQTTSwitch {
 public:
   MQTTDeviceResetSwitch(MQTTDeviceInfo deviceInfo, String uniqueId, String deviceName = "reset_switch");
-  void executeLoopMethod();
   void setupActor();
+  DynamicJsonDocument extendAutoDiscoveryInfo(DynamicJsonDocument autoConfigureJsonDocument);
+  void executeLoopMethod();
 };
 
 struct RGBPins {
@@ -162,6 +163,7 @@ private:
   LiquidCrystal *display;
   String lastText = "";
   void reportStatusInformation();
+  void displayMessage(String payload);
 
 public:
   MQTTLcdDisplay(MQTTDeviceInfo deviceInfo, String uniqueId, LiquidCrystal *display,
