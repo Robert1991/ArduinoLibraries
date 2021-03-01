@@ -11,6 +11,7 @@ DNSServer dnsServer;
 boolean configureMode = false;
 unsigned long updateTimer = millis();
 const int UPDATE_TIMEOUT = 60000;
+const int MAX_WIFI_RECONNECT_TRIES = 3;
 
 void setupDevice(WiFiClient &espClient, const String deviceId, const int buildNumber, int resetButtonPin,
                  const String pingId, String resetStateSwitchId, void mqttSetupFunction()) {
@@ -39,6 +40,8 @@ void setupDevice(WiFiClient &espClient, const String deviceId, const int buildNu
   configureMode = true;
 }
 
+int totalFailedWifiReconnectTries = 0;
+
 void loopDevice(int delayTimeout) {
 
   if (configureMode) {
@@ -49,9 +52,16 @@ void loopDevice(int delayTimeout) {
       deviceUpdateService->installUpdateIfPossible();
       updateTimer = millis();
     }
-    checkWifiStatus(rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName(),
-                    WIFI_STA, 8);
-    mqttDeviceService->executeLoop();
+    if (checkWifiStatus(rootConfig->wifiSSID, rootConfig->wifiPasswd, rootConfig->getCleanedDeviceName(),
+                        WIFI_STA, 8)) {
+      totalFailedWifiReconnectTries = 0;
+      mqttDeviceService->executeLoop();
+    } else {
+      if (totalFailedWifiReconnectTries == MAX_WIFI_RECONNECT_TRIES) {
+        ESP.restart();
+      }
+      totalFailedWifiReconnectTries += 1;
+    }
   }
 
   delay(delayTimeout);

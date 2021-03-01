@@ -80,22 +80,18 @@ DNSServer setupSoftAccessPointWithDnsServer(String ssid, String domainName) {
   return dnsServer;
 }
 
-unsigned long last_wifi_reconnect_attempt = 0;
-
-void checkWifiStatus(const String ssid, const String password, const String hostname, WiFiMode wifiMode,
+bool checkWifiStatus(const String ssid, const String password, const String hostname, WiFiMode wifiMode,
                      int maxReconnectTries) {
   if (WiFi.status() != WL_CONNECTED) {
-    unsigned long now = millis();
-    if (now - last_wifi_reconnect_attempt > 20000UL || last_wifi_reconnect_attempt == 0) {
-      Serial.println("Attempting to connect to WiFi");
-      last_wifi_reconnect_attempt = now;
-      WiFi.disconnect();
-      WiFi.mode(WIFI_OFF);
-      WiFi.mode(WIFI_STA);
-      setupWifiConnection(ssid, password, hostname, wifiMode, maxReconnectTries);
-    }
-    return;
+    Serial.println("Attempting to connect to WiFi");
+    WiFi.disconnect();
+    WiFi.mode(WIFI_OFF);
+    WiFi.mode(WIFI_STA);
+    wifi_connection_status connectionStatus =
+        setupWifiConnection(ssid, password, hostname, wifiMode, maxReconnectTries);
+    return connectionStatus == CONNECTED;
   }
+  return true;
 }
 
 Pinger pinger;

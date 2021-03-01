@@ -12,8 +12,8 @@ wifi_connection_status setupWifiConnection(const String ssid, const String passw
                                            const String hostname = "", WiFiMode wifiMode = WIFI_STA,
                                            int maxTries = 10);
 DNSServer setupSoftAccessPointWithDnsServer(String ssid, String domainName);
-void checkWifiStatus(const String ssid, const String password, const String hostname = "",
-                     WiFiMode wifiMode = WIFI_STA, int maxReconnectTries = 12);
+boolean checkWifiStatus(const String ssid, const String password, const String hostname = "",
+                        WiFiMode wifiMode = WIFI_STA, int maxReconnectTries = 12);
 
 // dropping in 0 as maxTries lets the station try forever
 boolean testWifiConnection(const String ssid, const String password, int maxTries = 5);
